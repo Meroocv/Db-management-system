@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Atendimentos</title>
+
+</head>
+<body>
+
+    <!-- MENU -->
+    <div class="menu">
+        <div>
+            <a href="/dashboard" >Dashboard</a>
+        <a href="/pacientes">Inserir Paciente</a>
+        <a href="/atendimentos">Inserir Atendimentos</a>
+        </div>
+        <div>
+            <a href="/logout">Sair</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Registrar Atendimento</h2>
+
+            <form method="POST" action="/salvar_atendimento">
+
+                <!-- PRONTUÁRIO -->
+                <label>Prontuário:</label>
+                <input type="text" id="prontuario" name="prontuario" required>
+
+                <!-- NOME (AUTOPREENCHIDO) -->
+                <label>Nome do Paciente:</label>
+                <input type="text" id="nome" name="nome" readonly>
+
+                <!-- DATA -->
+                <label>Data:</label>
+                <input type="date" name="data" required>
+
+                <!-- PROFISSIONAL -->
+                <label>Profissional:</label>
+                <input type="text" name="profissional" required>
+
+                <!-- PROCEDIMENTOS -->
+                <label>Procedimentos:</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" name="procedimentos" value="Acolhimento"> Acolhimento</label>
+                    <label><input type="checkbox" name="procedimentos" value="Atendimento Individual"> Atendimento Individual</label>
+                    <label><input type="checkbox" name="procedimentos" value="Visita Domiciliar"> Visita Domiciliar</label>
+                    <label><input type="checkbox" name="procedimentos" value="Atividade em Grupo"> Atividade em Grupo</label>
+                    <label><input type="checkbox" name="procedimentos" value="Falta"> Falta</label>
+                </div>
+
+                <!-- ACOLHIMENTO -->
+                <label>Ofertado acolhimento 24h?</label>
+                <select name="acolhimento">
+                    <option value="">Selecione</option>
+                    <option value="Sim">Sim</option>
+                    <option value="Não">Não</option>
+                </select>
+
+                <label>Paciente aceitou?</label>
+                <select name="aceitou">
+                    <option value="">Selecione</option>
+                    <option value="Sim">Sim</option>
+                    <option value="Não">Não</option>
+                </select>
+
+                <button type="submit">Salvar Atendimento</button>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT AUTOPREENCHER -->
+    <script>
+        document.getElementById("prontuario").addEventListener("blur", function() {
+            let prontuario = this.value;
+
+            fetch(`/buscar_paciente/${prontuario}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.nome) {
+                        document.getElementById("nome").value = data.nome;
+                    } else {
+                        document.getElementById("nome").value = "Paciente não encontrado";
+                    }
+                });
+        });
+    </script>
+
+</body>
+</html>

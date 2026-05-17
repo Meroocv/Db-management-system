@@ -1,43 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>Pacientes</title>
-</head>
-<body>
+{% extends 'base.html' %}
 
-    <h2>Cadastro de Paciente</h2>
+{% block conteudo %}
 
-    <form action="/salvar_paciente" method="post">
-        <input type="text" name="prontuario" placeholder="Prontuário" required><br><br>
-        <input type="text" name="nome" placeholder="Nome" required><br><br>
-        <input type="text" name="cns" placeholder="CNS"><br><br>
-        <input type="date" name="data_nascimento"><br><br>
+<h2>Cadastrar Paciente</h2>
 
-        <button type="submit">Salvar</button>
-    </form>
+<form action="/salvar_paciente" method="post">
+    <input type="text" name="prontuario" placeholder="Prontuário"><br><br>
+    <input type="text" name="nome" placeholder="Nome"><br><br>
+    <input type="text" name="cns" placeholder="CNS"><br><br>
+    <input type="date" name="data_nascimento"><br><br>
 
-    <hr>
+    <button type="submit">Salvar</button>
+</form>
 
-    <h3>Pacientes cadastrados</h3>
-
-    <table border="1">
-        <tr>
-            <th>ID</th>
-            <th>Prontuário</th>
-            <th>Nome</th>
-            <th>CNS</th>
-        </tr>
-
-        {% for p in pacientes %}
-        <tr>
-            <td>{{ p[0] }}</td>
-            <td>{{ p[1] }}</td>
-            <td>{{ p[2] }}</td>
-            <td>{{ p[3] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-</body>
-</html>
+{% endblock %}

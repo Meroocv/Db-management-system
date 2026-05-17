@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sistema</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- 🔝 MENU SUPERIOR -->
+    <div class="menu">
+        <div>
+            <a href="/dashboard" >Dashboard</a>
+        <a href="/pacientes">Inserir Paciente</a>
+        <a href="/atendimentos">Inserir Atendimentos</a>
+        </div>
+        <div>
+            <a href="/logout">Sair</a>
+        </div>
+    </div>
+
+    <div style="padding:20px;">
+        {% block conteudo %}{% endblock %}
+    </div>
+
+</body>
+</html>

@@ -8,11 +8,23 @@
 
     <h2>Criar Usuário</h2>
 
+    {% if erro %}
+    <p style="color:red;">{{ erro }}</p>
+    {% endif %}
     <form action="/cadastrar_usuario" method="post">
-        <input type="text" name="name" placeholder="Usuário" required><br><br>
+        <input type="text" name="cnes" placeholder="CNES de sua Unidade" required><br><br>
+        <input type="text" name="name" placeholder="Nome do servidor" required><br><br>
+        <select name="cbo" id="" placeholder="Escolha sua profissão conforme seu CBO" required>
+            <option value="">Escolha sua profissão conforme seu CBO</option>
+            <option value="">Assistente em Administração</option>
+            <option value="">Assistente Social</option>
+            <option value="">Psicologo Clínico</option>
+            <option value="">Terapêuta Ocupacional</option>
+        </select><br><br>
         <input type="text" name="cpf" placeholder="CPF" required><br><br>
-        <input type="email" name="e-mail" placeholder="E-mail" required><br><br>
+        <input type="email" name="email" placeholder="E-mail" required><br><br>
         <input type="password" name="senha" placeholder="Senha" required><br><br>
+        <input type="password" name="confirmar_senha" placeholder="Confirmar Senha" required><br><br>
 
         <button type="submit">Cadastrar</button>
     </form>

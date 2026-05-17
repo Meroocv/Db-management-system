@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+
+<h2>Bem-vindo, {{ usuario }} 👋</h2>
+
+<h3>Lista de Pacientes</h3>
+
+<table border="1" cellpadding="10">
+    <tr>
+        <th>Prontuário</th>
+        <th>Nome</th>
+        <th>CNS</th>
+        <th>Data de Nascimento</th>
+    </tr>
+
+    {% for p in pacientes %}
+    <tr>
+        <td>{{ p[1] }}</td>
+        <td>{{ p[2] }}</td>
+        <td>{{ p[3] }}</td>
+        <td>{{ p[4] }}</td>
+    </tr>
+    {% endfor %}
+
+</table>
+
+{% endblock %}
