@@ -1,103 +1,30 @@
 {% extends 'base.html' %}
 
 {% block conteudo %}
+<div class="container">
+    <h2>Bem-vindo, {{ usuario }} 👋</h2>
 
-<h2>Bem-vindo, {{ usuario }} 👋</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 cardzinho">
+            <div class="card-body">
+                <h6 class="text-muted">Pacientes Ativos</h6>
+                <h3>128</h3>
+                <small class="text-success">+5 este mês</small>
+            </div>
+            </div>
+        </div>
 
-<div class="card-tabela">
-    <h2>Pacientes</h2>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 cardzinho">
+            <div class="card-body">
+                <h6 class="text-muted">Novos Cadastros</h6>
+                <h3>14</h3>
+                <small class="text-success">+2 este mês</small>
+            </div>
+            </div>
+        </div>
 
-    <div class="tabela-container">
-        <table>
-            <thead>
-                <tr>
-                    <th class="sticky-col col1">Nº PRONT.</th>
-                    <th class="sticky-col col2">TERAPÊUTA DE REFERÊNCIA</th>
-                    <th class="sticky-col col3">NOME DO PACIENTE</th>
-                    <th class="sticky-col col4">NOME SOCIAL</th>
-                    <th>CNS PACIENTE</th>
-                    <th>RG</th>
-                    <th>CPF</th>
-                    <th>NATURALIDADE</th>
-                    <th>SEXO</th>
-                    <th>DATA NASC.</th>
-                    <th>RAÇA/COR</th>
-                    <th>ETNIA</th>
-                    <th>ORIENTAÇÃO RELIGIOSA</th>
-                    <th>ESCOLARIDADE</th>
-                    <th>NOME DA MÃE</th>
-                    <th>NOME DO PAI</th>
-                    <th>NOME DO RESPONSÁVEL</th>
-                    <th>GRAU DE PARENTESCO DO RESPONSÁVEL</th>
-                    <th>TELEFONE DO RESPONSÁVEL</th>
-                    <th>MUNICÍPIO</th>
-                    <th>UF</th>
-                    <th>ZONA</th>
-                    <th>CEP</th>
-                    <th>BAIRRO</th>
-                    <th>TIPO</th>
-                    <th>LOGRADOURO</th>
-                    <th>NÚM.</th>
-                    <th>COMPLEMENTO</th>
-                    <th>DDD</th>
-                    <th>TELEFONE</th>
-                    <th>DT ADMISSÃO</th>
-                    <th>ORIG. PACNTE</th>
-                    <th>ESPECIFICAÇÃO DA ORIGEM</th>
-                    <th>CNES USF</th>
-                    <th>CID</th>
-                    <th>STATUS</th>
-                    <th>DT CONCLUSAO</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in pacientes %}
-                <tr>
-                    <td class="sticky-col col1">
-                        <a href="#" onclick="abrirModal(this); return false;">
-                            {{ p[0] }}
-                        </a>
-                    </td>
-                    <td class="sticky-col col2">{{ p[1] }}</td>
-                    <td class="sticky-col col3">{{ p[2] }}</td>
-                    <td class="sticky-col col4">{{ p[3] }}</td>
-                    <td>{{ p[4] }}</td>
-                    <td>{{ p[5] }}</td>
-                    <td>{{ p[6] }}</td>
-                    <td>{{ p[7] }}</td>
-                    <td>{{ p[8] }}</td>
-                    <td>{{ p[9] }}</td>
-                    <td>{{ p[10] }}</td>
-                    <td>{{ p[11] }}</td>
-                    <td>{{ p[12] }}</td>
-                    <td>{{ p[13] }}</td>
-                    <td>{{ p[14] }}</td>
-                    <td>{{ p[15] }}</td>
-                    <td>{{ p[16] }}</td>
-                    <td>{{ p[17] }}</td>
-                    <td>{{ p[18] }}</td>
-                    <td>{{ p[19] }}</td>
-                    <td>{{ p[20] }}</td>
-                    <td>{{ p[21] }}</td>
-                    <td>{{ p[22] }}</td>
-                    <td>{{ p[23] }}</td>
-                    <td>{{ p[24] }}</td>
-                    <td>{{ p[25] }}</td>
-                    <td>{{ p[26] }}</td>
-                    <td>{{ p[27] }}</td>
-                    <td>{{ p[28] }}</td>
-                    <td>{{ p[29] }}</td>
-                    <td>{{ p[30] }}</td>
-                    <td>{{ p[31] }}</td>
-                    <td>{{ p[32] }}</td>
-                    <td>{{ p[33] }}</td>
-                    <td>{{ p[34] }}</td>
-                    <td>{{ p[35] }}</td>
-                    <td>{{ p[36] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     </div>
 </div>
 

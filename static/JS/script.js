@@ -1,151 +1,190 @@
-function abrirAba(aba) {
+function calcularIdade(data) {
+  if (!data) return "";
+
+  const hoje = new Date();
+  const nascimento = new Date(data);
+
+  if (Number.isNaN(nascimento.getTime())) return "";
+
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+
+  const m = hoje.getMonth() - nascimento.getMonth();
+
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+
+  return idade;
+}
+document.querySelectorAll(".idade").forEach(td => {
+  const data = td.dataset.nascimento;
+  const idade = calcularIdade(data);
+  td.innerText = idade ? idade + " anos" : "";
+});
+
+function abrirPaciente(btn, modo) {
+
+    let dados = {
+    prontuario: btn.dataset.prontuario,
+    nome_paciente: btn.dataset.nomePaciente,
+    nome_social: btn.dataset.nomeSocial,
+    cpf: btn.dataset.cpf,
+    rg: btn.dataset.rg,
+    cns_paciente: btn.dataset.cnsPaciente,
+    data_nascimento: btn.dataset.dataNascimento,
+    sexo: btn.dataset.sexo,
+    naturalidade: btn.dataset.naturalidade,
+    raca_cor: btn.dataset.racaCor,
+    escolaridade: btn.dataset.escolaridade,
+    etnia: btn.dataset.etnia,
+    orientacao_religiosa: btn.dataset.orientacaoReligiosa,
+    nome_mae: btn.dataset.nomeMae,
+    nome_pai: btn.dataset.nomePai,
+    nome_responsavel: btn.dataset.nomeResponsavel,
+    grau_parentesco_responsavel: btn.dataset.grauParentescoResponsavel,
+    telefone_responsavel: btn.dataset.telefoneResponsavel,
+    telefone: btn.dataset.telefone,
+    municipio: btn.dataset.municipio,
+    uf: btn.dataset.uf,
+    zona: btn.dataset.zona,
+    cep: btn.dataset.cep,
+    bairro: btn.dataset.bairro,
+    logradouro: btn.dataset.logradouro,
+    numero: btn.dataset.numero,
+    complemento: btn.dataset.complemento,
+    statusPaciente: btn.dataset.statusPaciente,
+    terapeuta_referencia: btn.dataset.terapeutaReferencia,
+    cid: btn.dataset.cid,
+    data_admissao: btn.dataset.dataAdmissao,
+    data_conclusao: btn.dataset.dataConclusao
+    };
+
+    function setValue(id, value) {
+        let el = document.getElementById(id);
+        if (el) el.value = value || "";
+    }
+
+    // preencher campos
+    setValue('prontuario', dados.prontuario);
+    setValue('nome_paciente', dados.nome_paciente);
+    setValue('nome_social', dados.nome_social);
+    setValue('cpf', dados.cpf);
+    setValue('rg', dados.rg);
+    setValue('cns_paciente', dados.cns_paciente);
+    setValue('data_nascimento', dados.data_nascimento);
+    setValue('sexo', dados.sexo);
+    setValue('naturalidade', dados.naturalidade);
+    setValue('raca_cor', dados.raca_cor);
+    setValue('escolaridade', dados.escolaridade);
+    setValue('etnia', dados.etnia);
+    setValue('orientacao_religiosa', dados.orientacao_religiosa);
+    setValue('nome_mae', dados.nome_mae);
+    setValue('nome_pai', dados.nome_pai);
+    setValue('nome_responsavel', dados.nome_responsavel);
+    setValue('grau_parentesco_responsavel', dados.grau_parentesco_responsavel);
+    setValue('telefone_responsavel', dados.telefone_responsavel);
+    setValue('telefone', dados.telefone);
+    setValue('municipio', dados.municipio);
+    setValue('uf', dados.uf);
+    setValue('zona', dados.zona);
+    setValue('cep', dados.cep);
+    setValue('bairro', dados.bairro);
+    setValue('tp_logradouro', dados.tp_logradouro);
+    setValue('logradouro', dados.logradouro);
+    setValue('numero', dados.numero);
+    setValue('complemento', dados.complemento);
+    setValue('statusPaciente', dados.statusPaciente);
+    setValue('terapeuta_referencia', dados.terapeuta_referencia);
+    setValue('cid', dados.cid);
+    setValue('data_admissao', dados.data_admissao);
+    setValue('data_conclusao', dados.data_conclusao);
+
+
+    // abrir modal
+    document.getElementById('modalPaciente').style.display = 'block';
+    abrirAba('identificacao', document.querySelector('#modalPaciente .nav-link'));
+
+    // aplicar modo
+    setModoPaciente(modo !== 'view');
+    document.getElementById("modo").value = (modo === 'view') ? 'view' : 'edit';
+}
+
+function abrirNovoPaciente() {
+
+  // limpa TUDO
+  document.querySelectorAll("#modalPaciente input, #modalPaciente select, #modalPaciente textarea")
+    .forEach(el => el.value = "");
+
+  // define prontuário como automático (visual)
+  document.getElementById('prontuario').value = 'Automático';
+
+  // abre modal
+  document.getElementById('modalPaciente').style.display = 'block';
+  abrirAba('identificacao', document.querySelector('#modalPaciente .nav-link'));
+
+  // ativa modo edição
+  setModoPaciente(true);
+
+  // define modo (IMPORTANTE pra salvar depois)
+  document.getElementById("modo").value = "novo";
+}
+
+
+
+function setModoPaciente(editavel) {
+
+    const inputs = document.querySelectorAll('#modalPaciente input, #modalPaciente select, #modalPaciente textarea');
+
+    inputs.forEach(el => {
+        if (el.tagName === 'SELECT') {
+            el.disabled = !editavel;
+        } else {
+            el.readOnly = !editavel;
+        }
+
+        // ❌ REMOVE ISSO
+        // el.disabled = !editavel;
+    });
+
+    // 🔒 manter apenas readonly
+    const prontuario = document.getElementById('prontuario');
+    if (prontuario) {
+        prontuario.readOnly = true;
+        // prontuario.disabled = true ❌ REMOVE
+    }
+
+    document.getElementById('btnSalvar').style.display = editavel ? 'inline-block' : 'none';
+}
+
+function abrirAba(aba, link) {
     document.querySelectorAll('.aba').forEach(div => {
         div.style.display = 'none';
     });
 
     document.getElementById(aba).style.display = 'block';
-}
 
-function abrirModal(elemento) {
-    console.log("clicou no prontuário");
-
-    let linha = elemento.closest("tr");
-    let colunas = linha.querySelectorAll("td");
-
-    let dados = {
-        prontuario: colunas[0]?.innerText || "",
-        terapeuta_referencia: colunas[1]?.innerText || "",
-        nome_paciente: colunas[2]?.innerText || "",
-        nome_social: colunas[3]?.innerText || "",
-        cns_paciente: colunas[4]?.innerText || "",
-        rg: colunas[5]?.innerText || "",
-        cpf: colunas[6]?.innerText || "",
-        naturalidade: colunas[7]?.innerText || "",
-        sexo: colunas[8]?.innerText || "",
-        data_nascimento: colunas[9]?.innerText || "",
-        raca_cor: colunas[10]?.innerText || "",
-        etnia: colunas[11]?.innerText || "",
-        escolaridade: colunas[13]?.innerText || "",
-        nome_mae: colunas[14]?.innerText || "",
-        nome_pai: colunas[15]?.innerText || "",
-        nome_responsavel: colunas[16]?.innerText || "",
-        grau_parentesco_responsavel: colunas[17]?.innerText || "",
-        telefone_responsavel: colunas[18]?.innerText || "",
-        municipio: colunas[19]?.innerText || "",
-        uf: colunas[20]?.innerText || "",
-        zona: colunas[21]?.innerText || "",
-        cep: colunas[22]?.innerText || "",
-        bairro: colunas[23]?.innerText || "",
-        tipo: colunas[24]?.innerText || "",
-        logradouro: colunas[25]?.innerText || "",
-        numero: colunas[26]?.innerText || "",
-        complemento: colunas[27]?.innerText || "",
-        telefone: colunas[29]?.innerText || "",
-        data_admissao: colunas[30]?.innerText || "",
-        origem_paciente: colunas[31]?.innerText || "",
-        especificacao_origem: colunas[32]?.innerText || "",
-        cnes_usf: colunas[33]?.innerText || "",
-        cid: colunas[34]?.innerText || "",
-        status: colunas[35]?.innerText || "",
-        data_conclusao: colunas[36]?.innerText || ""
-    };
-
-    // IDENTIFICAÇÃO
-    document.getElementById('prontuario').value = dados.prontuario;
-    document.getElementById('nome_paciente').value = dados.nome_paciente;
-    document.getElementById('nome_social').value = dados.nome_social;
-    document.getElementById('cpf').value = dados.cpf;
-    document.getElementById('rg').value = dados.rg;
-    document.getElementById('cns_paciente').value = dados.cns_paciente;
-
-    // FAMÍLIA
-    document.getElementById('nome_mae').value = dados.nome_mae;
-    document.getElementById('nome_pai').value = dados.nome_pai;
-    document.getElementById('nome_responsavel').value = dados.nome_responsavel;
-    document.getElementById('grau_parentesco_responsavel').value = dados.grau_parentesco_responsavel;
-    document.getElementById('telefone_responsavel').value = dados.telefone_responsavel;
-
-    // PESSOAL
-    document.getElementById('data_nascimento').value = dados.data_nascimento;
-    document.getElementById('sexo').value = dados.sexo;
-    document.getElementById('naturalidade').value = dados.naturalidade;
-    document.getElementById('raca_cor').value = dados.raca_cor;
-    document.getElementById('etnia').value = dados.etnia;
-    document.getElementById('escolaridade').value = dados.escolaridade;
-
-    // ENDEREÇO
-    document.getElementById('municipio').value = dados.municipio;
-    document.getElementById('uf').value = dados.uf;
-    document.getElementById('cep').value = dados.cep;
-    document.getElementById('bairro').value = dados.bairro;
-    document.getElementById('logradouro').value = dados.logradouro;
-    document.getElementById('numero').value = dados.numero;
-    document.getElementById('complemento').value = dados.complemento;
-
-    // STATUS
-    document.getElementById('status').value = dados.status;
-    document.getElementById('cid').value = dados.cid;
-    document.getElementById('data_admissao').value = dados.data_admissao;
-    document.getElementById('data_conclusao').value = dados.data_conclusao;
-
-    // ABRIR MODAL
-    document.getElementById('modalPaciente').style.display = 'block';
-}
-function habilitarEdicao() {
-
-    // pega todos os inputs
-    const inputs = document.querySelectorAll('#modalPaciente input');
-
-    // 🔒 primeiro: trava todos
-    inputs.forEach(input => {
-        input.setAttribute('readonly', true);
+    document.querySelectorAll('#modalPaciente .nav-link').forEach(nav => {
+        nav.classList.remove('active');
+        nav.removeAttribute('aria-current');
     });
 
-    // 🔓 depois: libera apenas os editáveis (exceto prontuário)
-    const editaveis = [
-        'nome_paciente',
-        'nome_social',
-        'cpf',
-        'rg',
-        'cns_paciente',
-        'nome_mae',
-        'nome_pai',
-        'nome_responsavel',
-        'grau_parentesco_responsavel',
-        'telefone_responsavel',
-        'data_nascimento',
-        'sexo',
-        'naturalidade',
-        'raca_cor',
-        'escolaridade',
-        'etnia',
-        'orientacao_religiosa',
-        'telefone',
-        'municipio',
-        'uf',
-        'cep',
-        'bairro',
-        'logradouro',
-        'numero',
-        'complemento',
-        'status',
-        'cid',
-        'data_admissao',
-        'data_conclusao'
-    ];
-
-    editaveis.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.removeAttribute('readonly');
-    });
-
-    // 🔒 garante que prontuário nunca será editável
-    document.getElementById('prontuario').setAttribute('readonly', true);
-
-    // botões
-    document.getElementById('btnSalvar').style.display = 'inline-block';
-    document.getElementById('btnEditar').style.display = 'none';
+    if (link) {
+        link.classList.add('active');
+        link.setAttribute('aria-current', 'page');
+    }
 }
+
+
+function toggleSidebar() {
+  document.getElementById("sidebarMenu").classList.toggle("closed");
+
+  const main = document.querySelector(".main-content");
+  if (main) {
+    main.classList.toggle("shift");
+  }
+}
+
+
 function salvarEdicao() {
     let dados = {
         prontuario: document.getElementById('prontuario').value,
@@ -180,6 +219,7 @@ function salvarEdicao() {
         // Endereço
         municipio: document.getElementById('municipio')?.value || '',
         uf: document.getElementById('uf')?.value || '',
+        zona: document.getElementById('zona')?.value || '',
         cep: document.getElementById('cep')?.value || '',
         bairro: document.getElementById('bairro')?.value || '',
         logradouro: document.getElementById('logradouro')?.value || '',
@@ -187,7 +227,7 @@ function salvarEdicao() {
         complemento: document.getElementById('complemento')?.value || '',
 
         // Status clínico
-        status: document.getElementById('status')?.value || '',
+        statusPaciente: document.getElementById('statusPaciente')?.value || '',
         cid: document.getElementById('cid')?.value || '',
         data_admissao: document.getElementById('data_admissao')?.value || '',
         data_conclusao: document.getElementById('data_conclusao')?.value || ''
@@ -212,8 +252,6 @@ function salvarEdicao() {
     });
 }
 function fecharModal() {
-    document.getElementById('btnSalvar').style.display = 'none';
-    document.getElementById('btnEditar').style.display = 'inline-block';
     document.getElementById('modalPaciente').style.display = 'none';
 
     // esconde todas as abas
@@ -224,70 +262,223 @@ function fecharModal() {
     // mostra identificação
     document.getElementById('identificacao').style.display = 'block';
 
-    // reseta botão ativo
-    document.querySelectorAll('.tabs button').forEach(btn => {
-        btn.classList.remove('ativo');
+    // reseta aba ativa
+    document.querySelectorAll('#modalPaciente .nav-link').forEach(link => {
+        link.classList.remove('active');
+        link.removeAttribute('aria-current');
     });
 
     // ativa primeira aba
-    const primeira = document.querySelector('.tabs button');
-    if (primeira) primeira.classList.add('ativo');
+    const primeira = document.querySelector('#modalPaciente .nav-link');
+    if (primeira) {
+        primeira.classList.add('active');
+        primeira.setAttribute('aria-current', 'page');
+    }
     document.getElementById('modalPaciente').style.display = 'none';
 }
 
-function filtrarTabela() {
-    const filtro = document.getElementById('filtro').value.toLowerCase();
-    const tabela = document.getElementById('tabelaPacientes');
-    const linhas = tabela.getElementsByTagName('tr');
-
-    for (let i = 1; i < linhas.length; i++) {
-        const celulas = linhas[i].getElementsByTagName('td');
-        let encontrou = false;
-
-        for (let j = 0; j < celulas.length; j++) {
-            if (celulas[j].textContent.toLowerCase().includes(filtro)) {
-                encontrou = true;
-                break;
-            }
-        }
-
-        linhas[i].style.display = encontrou ? '' : 'none';
-    }
-}
-
-function ordenarTabela(coluna) {
-    const tabela = document.getElementById('tabelaPacientes');
-    const linhas = Array.from(tabela.getElementsByTagName('tr')).slice(1);
-    const indice = ['prontuario', 'terapeuta_referencia', 'nome_paciente', 'nome_social', 'cns_paciente', 'rg', 'cpf', 'naturalidade', 'sexo', 'data_nascimento', 'raca_cor', 'etnia', 'escolaridade', 'nome_mae', 'nome_pai', 'nome_responsavel', 'grau_parentesco_responsavel', 'telefone_responsavel', 'municipio', 'uf', 'zona', 'cep', 'bairro', 'tipo', 'logradouro', 'numero', 'complemento', 'telefone', 'data_admissao', 'origem_paciente', 'especificacao_origem', 'cnes_usf', 'cid', 'status', 'data_conclusao'].indexOf(coluna);
-}
-
 document.addEventListener("DOMContentLoaded", function() {
-    document.getElementById("prontuario_atendimento").addEventListener("blur", function() {
-        let prontuario = this.value;
+    const campo = document.getElementById("prontuario_atendimento");
 
-        console.log("Buscando:", prontuario);
+    if (campo) {
+        campo.addEventListener("blur", function() {
+            let prontuario = this.value.trim();
 
-        fetch(`/buscar_paciente?prontuario=${prontuario}`)
-            .then(res => res.json())
-            .then(data => {
-                console.log("Resposta:", data);
+            // 🚫 BLOQUEIO PRINCIPAL
+            if (!prontuario || prontuario === "0") {
+                console.log("Prontuário inválido, não buscar");
+                return;
+            }
 
-                if (data.nome_paciente) {
-                    document.getElementById("nome_paciente_atendimento").value = data.nome_paciente;
-                } else {
-                    document.getElementById("nome_paciente_atendimento").value = "Paciente não encontrado";
-                }
-            })
-            .catch(() => {
-                document.getElementById("nome_paciente_atendimento").value = "Erro na busca";
-            });
-    });
+            console.log("Buscando:", prontuario);
+
+            fetch(`/buscar_paciente?prontuario=${prontuario}`)
+                .then(res => res.json())
+                .then(data => {
+                    const campoNome = document.getElementById("nome_paciente_atendimento");
+
+                    if (!campoNome) return;
+
+                    if (data.nome_paciente) {
+                        campoNome.value = data.nome_paciente;
+                    } else {
+                        campoNome.value = "Paciente não encontrado";
+                    }
+                })
+                .catch(() => {
+                    const campoNome = document.getElementById("nome_paciente_atendimento");
+                    if (campoNome) {
+                        campoNome.value = "Erro na busca";
+                    }
+                });
+        });
+    }
 });
 
-function inserirAtendimento() {
-    const prontuario = document.getElementById('prontuario').value;
-    if (!prontuario) {
-        alert('Prontuário não encontrado!');
+    
+function abrirModalAtendimento() {
+    const modal = document.getElementById('modalAtendimento');
+    if (!modal) return;
+
+    document.querySelectorAll('#modalAtendimento input, #modalAtendimento select, #modalAtendimento textarea')
+        .forEach(el => {
+            if (el.type === 'checkbox') {
+                el.checked = false;
+            } else {
+                el.value = '';
+            }
+        });
+
+    const data = document.getElementById('data_atendimento');
+    if (data) data.value = new Date().toISOString().slice(0, 10);
+
+    modal.style.display = 'block';
+    document.getElementById('prontuario_atendimento')?.focus();
+}
+
+function fecharModalAtendimento() {
+    const modal = document.getElementById('modalAtendimento');
+    if (modal) modal.style.display = 'none';
+}
+
+function salvarAtendimento() {
+    const valor = (id) => document.getElementById(id)?.value || '';
+    const procedimentos = Array.from(document.querySelectorAll('input[name="procedimentos_atendimento"]:checked'))
+        .map(input => input.value)
+        .join(', ');
+
+    const dados = {
+        prontuario: valor('prontuario_atendimento'),
+        data_atendimento: valor('data_atendimento'),
+        profissional: valor('profissional_atendimento'),
+        procedimentos,
+        acolhimento_24h: valor('acolhimento_24h'),
+        paciente_aceitou: valor('paciente_aceitou'),
+        observacoes: valor('observacoes_atendimento')
+    };
+
+    if (!dados.prontuario.trim()) {
+        alert("Informe o prontuario.");
+        document.getElementById('prontuario_atendimento')?.focus();
         return;
+    }
+
+    if (!dados.data_atendimento) {
+        alert("Informe a data do atendimento.");
+        document.getElementById('data_atendimento')?.focus();
+        return;
+    }
+
+    if (!dados.profissional.trim()) {
+        alert("Informe o profissional.");
+        document.getElementById('profissional_atendimento')?.focus();
+        return;
+    }
+
+    if (!dados.procedimentos) {
+        alert("Selecione pelo menos um procedimento.");
+        return;
+    }
+
+    fetch('/novo_atendimento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+    })
+    .then(res => res.json().then(data => {
+        if (!res.ok) throw new Error(data.erro || 'Erro ao cadastrar atendimento');
+        return data;
+    }))
+    .then(data => {
+        alert(data.mensagem || "Atendimento cadastrado!");
+        fecharModalAtendimento();
+        location.reload();
+    })
+    .catch(err => {
+        console.error(err);
+        alert(err.message || "Erro ao cadastrar atendimento");
+    });
+}
+
+
+function inserirPaciente() {
+    const valor = (id) => document.getElementById(id)?.value || '';
+
+    let dados = {
+        nome_paciente: valor('nome_paciente'),
+        nome_social: valor('nome_social'),
+        cpf: valor('cpf'),
+        rg: valor('rg'),
+        cns_paciente: valor('cns_paciente'),
+        data_nascimento: valor('data_nascimento'),
+        sexo: valor('sexo'),
+        naturalidade: valor('naturalidade'),
+        raca_cor: valor('raca_cor'),
+        escolaridade: valor('escolaridade'),
+        etnia: valor('etnia'),
+        orientacao_religiosa: valor('orientacao_religiosa'),
+
+        nome_mae: valor('nome_mae'),
+        nome_pai: valor('nome_pai'),
+        nome_responsavel: valor('nome_responsavel'),
+        grau_parentesco_responsavel: valor('grau_parentesco_responsavel'),
+        telefone_responsavel: valor('telefone_responsavel'),
+
+        telefone: valor('telefone'),
+        municipio: valor('municipio'),
+        uf: valor('uf'),
+        zona: valor('zona'),
+        cep: valor('cep'),
+        bairro: valor('bairro'),
+        logradouro: valor('logradouro'),
+        numero: valor('numero'),
+        complemento: valor('complemento'),
+
+        statusPaciente: valor('statusPaciente'),
+        terapeuta_referencia: valor('terapeuta_referencia'),
+        cid: valor('cid'),
+        data_admissao: valor('data_admissao'),
+        data_conclusao: valor('data_conclusao')
+    };
+
+    if (!dados.nome_paciente.trim()) {
+        alert("Informe o nome do paciente.");
+        document.getElementById('nome_paciente')?.focus();
+        return;
+    }
+
+    if (!dados.data_nascimento) {
+        alert("Informe a data de nascimento.");
+        document.getElementById('data_nascimento')?.focus();
+        return;
+    }
+
+    fetch('/novo_paciente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+    })
+    .then(res => res.json().then(data => {
+        if (!res.ok) throw new Error(data.erro || 'Erro ao cadastrar paciente');
+        return data;
+    }))
+    .then(data => {
+        alert(data.mensagem || "Paciente cadastrado!");
+        fecharModal();
+        location.reload();
+    })
+    .catch(err => {
+        console.error(err);
+        alert(err.message || "Erro ao cadastrar paciente");
+    });
+}
+
+function salvarPaciente() {
+    const modo = document.getElementById("modo").value;
+
+    if (modo === "novo") {
+        inserirPaciente();
+    } else {
+        salvarEdicao();
     }
 }

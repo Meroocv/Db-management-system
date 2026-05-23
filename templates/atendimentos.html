@@ -1,99 +1,130 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>Atendimentos</title>
+{% extends 'base.html' %}
 
-</head>
-<body>
+{% block conteudo %}
+<div style="margin-top: 25px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Atendimentos</h3>
+  </div>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="card mb-4 shadow-sm border-0">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Buscar atendimento...">
+          </div>
 
-    <!-- MENU -->
-    <div class="menu">
-        <div>
-            <a href="/dashboard" >Dashboard</a>
-        <a href="/pacientes">Inserir Paciente</a>
-        <a href="/atendimentos">Inserir Atendimentos</a>
+          <div class="col-md-2">
+            <select class="form-select">
+              <option>Procedimento</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <input type="date" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <button class="btn btn-outline-primary w-100 botao">Filtrar</button>
+          </div>
         </div>
-        <div>
-            <a href="/logout">Sair</a>
-        </div>
+      </div>
     </div>
-
-    <div class="container">
-        <div class="card">
-            <h2>Registrar Atendimento</h2>
-
-            <form method="POST" action="/salvar_atendimento">
-
-                <!-- PRONTUÁRIO -->
-                <label>Prontuário:</label>
-                <input type="text" id="prontuario_atendimento" onblur="buscarPaciente()" name="prontuario" inputmode="numeric" required>
-
-                <!-- NOME (AUTOPREENCHIDO) -->
-                <label>Nome do Paciente:</label>
-                <input type="text" id="nome_paciente_atendimento" readonly>
-
-                <!-- DATA -->
-                <label>Data:</label>
-                <input type="date" name="data" required>
-
-                <!-- PROFISSIONAL -->
-                <label>Profissional:</label>
-                <input type="text" name="profissional" required>
-
-                <!-- PROCEDIMENTOS -->
-                <label>Procedimentos:</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" name="procedimentos" value="Acolhimento"> Acolhimento</label>
-                    <label><input type="checkbox" name="procedimentos" value="Atendimento Individual"> Atendimento Individual</label>
-                    <label><input type="checkbox" name="procedimentos" value="Visita Domiciliar"> Visita Domiciliar</label>
-                    <label><input type="checkbox" name="procedimentos" value="Atividade em Grupo"> Atividade em Grupo</label>
-                    <label><input type="checkbox" name="procedimentos" value="Falta"> Falta</label>
-                </div>
-
-                <!-- ACOLHIMENTO -->
-                <label>Ofertado acolhimento 24h?</label>
-                <select name="acolhimento">
-                    <option value="">Selecione</option>
-                    <option value="Sim">Sim</option>
-                    <option value="Não">Não</option>
-                </select>
-
-                <label>Paciente aceitou?</label>
-                <select name="aceitou">
-                    <option value="">Selecione</option>
-                    <option value="Sim">Sim</option>
-                    <option value="Não">Não</option>
-                </select>
-
-                <button type="submit">Salvar Atendimento</button>
-
-            </form>
-        </div>
+    <div class="d-flex justify-content-end"> 
+        <button class="btn btn-primary" onclick="abrirModalAtendimento()">+ Novo atendimento</button>
     </div>
+  </div>
+  <div class="container-fluid">
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th class="text-center">ID</th>
+            <th class="text-center">PRONT.</th>
+            <th class="text-center">PACIENTE</th>
+            <th class="text-center">DATA</th>
+            <th class="text-center">PROFISSIONAL</th>
+            <th class="text-center">PROCEDIMENTOS</th>
+            <th class="text-center">ACOLHIMENTO</th>
+            <th class="text-center">ACEITOU</th>
+          </tr>
+        </thead>
 
-    <!-- SCRIPT AUTOPREENCHER -->
-    <script>
-        function buscarPaciente() {
-            let prontuario = document.getElementById("prontuario_atendimento").value.trim();
+        <tbody>
+          {% for a in atendimentos %}
+          <tr>
+            <td class="text-center">{{ a[0] }}</td>
+            <td class="text-center">{{ a[1] }}</td>
+            <td class="text-center">
+              <strong>{{ a[2] or 'Paciente nao encontrado' }}</strong>
+            </td>
+            <td class="text-center">{{ a[3] }}</td>
+            <td class="text-center">{{ a[4] }}</td>
+            <td class="text-center">{{ a[5] }}</td>
+            <td class="text-center">{{ a[6] }}</td>
+            <td class="text-center">{{ a[7] }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted">Nenhum atendimento cadastrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-            if (!prontuario) return;
+<div id="modalAtendimento" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="fecharModalAtendimento()">&times;</span>
+    <h2>Registrar Atendimento</h2>
 
-            fetch(`/buscar_paciente?prontuario=${prontuario}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.nome_paciente) {
-                        document.getElementById("nome_paciente_atendimento").value = data.nome_paciente;
-                    } else {
-                        document.getElementById("nome_paciente_atendimento").value = "Paciente não encontrado";
-                    }
-                })
-                .catch(() => {
-                    document.getElementById("nome_paciente_atendimento").value = "Erro na busca";
-                });
-        }
-    </script>
+    <div>
+      <label>Prontuario:</label>
+      <input type="text" id="prontuario_atendimento" inputmode="numeric" required>
 
-</body>
-</html>
+      <label>Nome do Paciente:</label>
+      <input type="text" id="nome_paciente_atendimento" readonly>
+
+      <label>Data:</label>
+      <input type="date" id="data_atendimento" required>
+
+      <label>Profissional:</label>
+      <input type="text" id="profissional_atendimento" maxlength="120" required>
+
+      <label>Procedimentos:</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento"> Acolhimento</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual"> Atendimento Individual</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar"> Visita Domiciliar</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo"> Atividade em Grupo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Falta"> Falta</label>
+      </div>
+
+      <label>Ofertado acolhimento 24h?</label>
+      <select id="acolhimento_24h">
+        <option value="">Selecione</option>
+        <option value="Sim">Sim</option>
+        <option value="Nao">Nao</option>
+      </select>
+
+      <label>Paciente aceitou?</label>
+      <select id="paciente_aceitou">
+        <option value="">Selecione</option>
+        <option value="Sim">Sim</option>
+        <option value="Nao">Nao</option>
+        <option value="Nao se aplica">Nao se aplica</option>
+      </select>
+
+      <label>Observacoes:</label>
+      <textarea id="observacoes_atendimento" rows="4" maxlength="1000"></textarea>
+
+      <br><br>
+
+      <button type="button" id="btnSalvarAtendimento" onclick="salvarAtendimento()">
+        Salvar Atendimento
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}

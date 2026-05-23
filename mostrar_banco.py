@@ -1,12 +1,16 @@
 import sqlite3
 
-conn = sqlite3.connect("database.db")
+conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
-cursor.execute("PRAGMA table_info(pacientes)")
-colunas = cursor.fetchall()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS pacientes (
+    prontuario INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome_paciente TEXT,
+    cpf TEXT,
+    data_nascimento TEXT
+)
+""")
 
-for coluna in colunas:
-    print(coluna)
-
+conn.commit()
 conn.close()

@@ -1,18 +1,10 @@
-input, button {
-    padding: 10px;
-    margin: 5px;
-}
-
-button {
-    background-color: #2c7be5;
+.menucompleto {
+    background-color: #f9fafe;
     color: white;
-    border: none;
 }
 
 
 table {
-    border-collapse: collapse;
-    min-width: 1600px; /* 👈 força largura maior */
     border-collapse: collapse;
     width: 100%;
 }
@@ -45,9 +37,8 @@ body {
 
         /* MENU SUPERIOR */
         .menu {
-            background-color: #2c3e50;
             padding: 15px;
-            color: white;
+            border-bottom: 3px solid #f3f4f8;;
             display: flex;
             justify-content: space-between;
         }
@@ -97,20 +88,17 @@ body {
             display: block;
         }
 
-        button {
-            margin-top: 20px;
-            padding: 10px;
-            width: 100%;
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 6px;
         }
 
-        button:hover {
-            background-color: #219150;
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
         }
+
 
 .modal {
     display: none;
@@ -151,3 +139,131 @@ input[readonly] {
   border: 1px solid #ddd;
   cursor: not-allowed;
 }
+
+#sidebarMenu {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  height: calc(100vh - 56px);
+  width: 250px;
+
+  transform: translateX(0px);
+  transition: transform 0.3s ease;
+
+  background: #fafbff;
+  z-index: 1040;
+  border-right: 3px solid #f3f4f8;
+}
+
+/* fechado */
+#sidebarMenu.closed {
+  transform: translateX(-250px);
+}
+
+/* conteúdo da página */
+.main-content {
+  margin-top: 15px;
+  margin-left: 0;
+  transition: 0.3s;
+}
+
+.main-content.shift {
+  margin-left: 250px;
+}
+
+.table-wrapper {
+  width: 100%;
+}
+
+.tabela-container {
+  width: 100%;
+  table-layout: auto;
+  font-size: 13px;
+}
+
+.tabela-container th {
+  border: 1px solid red;
+}
+
+
+.tabela-container td{
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tabela-container th,
+.tabela-container td {
+  padding: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Prontuário (número pequeno) */
+td:nth-child(1), th:nth-child(1) {
+    min-width: 20px;
+    max-width: 20px;
+}
+
+td:nth-child(2), th:nth-child(2) {
+    max-width: 80px;
+}
+
+/* CPF (tamanho fixo lógico) */
+td:nth-child(3), th:nth-child(3) {
+  max-width: 35px;
+}
+
+/* Data */
+td:nth-child(4), th:nth-child(4) {
+  max-width: 45px;
+}
+
+td:nth-child(5), th:nth-child(5) {
+  max-width: 50px;
+}
+
+/* Status */
+td:nth-child(6), th:nth-child(6) {
+  max-width: 50px;
+}
+
+/* Ações */
+td:nth-child(7), th:nth-child(7) {
+  max-width: 25px;
+}
+
+table{
+    font-size: 13px;
+}
+
+.cardzinho{
+    max-width: 300px;
+    max-height: 130px;
+}
+
+.card{
+    margin:0;
+    padding:0;
+}
+
+.modal-content {
+  position: relative;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 28px;
+  font-weight: bold;
+  color: #555;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.close:hover {
+  color: red;
+  transform: scale(1.2);
+}
+
