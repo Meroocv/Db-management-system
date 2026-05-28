@@ -267,3 +267,61 @@ table{
   transform: scale(1.2);
 }
 
+.avatar-menu {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+}
+
+.modal-perfil {
+  max-width: 560px;
+  width: min(92vw, 560px);
+}
+
+.perfil-topo {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.avatar-perfil {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #eef1f6;
+}
+
+.modal-perfil small {
+  color: #6c757d;
+  display: block;
+  margin-top: 4px;
+}
+
+.acoes-modal {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.acoes-modal button,
+.modal-perfil button {
+  width: auto;
+  padding: 8px 14px;
+}
+
+.painel-rh {
+  max-width: none;
+  margin-top: 20px;
+  padding: 0;
+}
+
+@media (max-width: 600px) {
+  .perfil-topo {
+    grid-template-columns: 1fr;
+  }
+}
+

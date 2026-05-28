@@ -37,15 +37,15 @@
           href="#"
           data-bs-toggle="dropdown">
 
-          <img src="https://via.placeholder.com/32"
-            class="rounded-circle me-2">
+          <img src="{% if usuario_foto %}{{ url_for('static', filename=usuario_foto) }}{% else %}https://via.placeholder.com/32{% endif %}"
+            class="rounded-circle me-2 avatar-menu">
 
           <strong>{{ usuario }}</strong>
         </a>
 
         <ul class="dropdown-menu dropdown-menu-end">
 
-          <li><a class="dropdown-item" href="#">Perfil</a></li>
+          <li><a class="dropdown-item" href="#" onclick="abrirModalPerfil()">Perfil</a></li>
           <li><a class="dropdown-item" href="#">Configurações</a></li>
 
           <li><hr class="dropdown-divider"></li>
@@ -62,6 +62,52 @@
     <div class="main-content" style="padding:20px;">
         {% block conteudo %}{% endblock %}
     </div>
+{% if servidor %}
+<div id="modalPerfil" class="modal">
+  <div class="modal-content modal-perfil">
+    <span class="close" onclick="fecharModalPerfil()">&times;</span>
+    <h2>Meu perfil</h2>
+
+    <form action="/atualizar_perfil" method="post" enctype="multipart/form-data">
+      <div class="perfil-topo">
+        <img
+          src="{% if servidor['foto_perfil'] %}{{ url_for('static', filename=servidor['foto_perfil']) }}{% else %}https://via.placeholder.com/96{% endif %}"
+          class="avatar-perfil"
+          alt="Foto do perfil">
+        <div>
+          <label>Foto de perfil</label>
+          <input type="file" name="foto_perfil" accept="image/png,image/jpeg,image/webp">
+          <small>PNG, JPG ou WEBP ate 2 MB.</small>
+        </div>
+      </div>
+
+      <label>CNES</label>
+      <input type="text" name="cnes" value="{{ servidor['cnes'] }}" required>
+
+      <label>Nome</label>
+      <input type="text" name="name" value="{{ servidor['name'] }}" required>
+
+      <label>E-mail</label>
+      <input type="email" name="email" value="{{ servidor['email'] }}" required>
+
+      <label>CBO</label>
+      <select name="cbo" required>
+        {% for codigo, nome in cbo_opcoes.items() %}
+          <option value="{{ codigo }}" {% if servidor['cbo'] == codigo %}selected{% endif %}>
+            {{ codigo }} - {{ nome }}
+          </option>
+        {% endfor %}
+      </select>
+      <small>Alteracoes de CBO ficam pendentes ate aprovacao por Assistente em Administracao.</small>
+
+      <div class="acoes-modal">
+        <button type="button" onclick="fecharModalPerfil()">Cancelar</button>
+        <button type="submit">Salvar perfil</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 <!-- Modal -->
 <div id="modalPaciente" class="modal">
   <div class="modal-content">
