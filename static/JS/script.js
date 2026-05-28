@@ -184,6 +184,16 @@ function toggleSidebar() {
   }
 }
 
+function abrirModalPerfil() {
+  const modal = document.getElementById('modalPerfil');
+  if (modal) modal.style.display = 'block';
+}
+
+function fecharModalPerfil() {
+  const modal = document.getElementById('modalPerfil');
+  if (modal) modal.style.display = 'none';
+}
+
 
 function salvarEdicao() {
     let dados = {
