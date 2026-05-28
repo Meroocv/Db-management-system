@@ -39,13 +39,11 @@
         <thead>
           <tr>
             <th class="text-center">ID</th>
-            <th class="text-center">PRONT.</th>
-            <th class="text-center">PACIENTE</th>
-            <th class="text-center">DATA</th>
-            <th class="text-center">PROFISSIONAL</th>
-            <th class="text-center">PROCEDIMENTOS</th>
-            <th class="text-center">ACOLHIMENTO</th>
-            <th class="text-center">ACEITOU</th>
+            <th class="text-center" style="max-width: 40px">PRONT.</th>
+            <th class="text-center" style="max-width: 120px">PACIENTE</th>
+            <th class="text-center" style="max-width: 50px">DATA</th>
+            <th class="text-center" style="max-width: 120px">PROFISSIONAL</th>
+            <th class="text-center" style="max-width: 100px">PROCEDIMENTOS</th>
           </tr>
         </thead>
 
@@ -59,9 +57,12 @@
             </td>
             <td class="text-center">{{ a[3] }}</td>
             <td class="text-center">{{ a[4] }}</td>
-            <td class="text-center">{{ a[5] }}</td>
-            <td class="text-center">{{ a[6] }}</td>
-            <td class="text-center">{{ a[7] }}</td>
+            <td class="text-center td-procedimento">
+              <div class="truncate-2-lines">
+                {{ a[5] }}
+              </div>
+            </td>
+
           </tr>
           {% else %}
           <tr>
@@ -94,10 +95,17 @@
 
       <label>Procedimentos:</label>
       <div class="checkbox-group">
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento"> Acolhimento</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual"> Atendimento Individual</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar"> Visita Domiciliar</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo"> Atividade em Grupo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento inicial">Acolhimento Inicial</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento Diurno">Acolhimento Diurno</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual">Atendimento Individual</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento em Grupo">Atendimento em Grupo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Familiar">Atendimento Familiar</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar">Visita Domiciliar</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Articulação de Rede">Articulação de Rede</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Fortalecimento do Protagonismo">Fortalecimento do Protagonismo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Corporais">Práticas Corporais</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Expressivas">Práticas Expressivas</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo">Atividade em Grupo</label>
         <label><input type="checkbox" name="procedimentos_atendimento" value="Falta"> Falta</label>
       </div>
 

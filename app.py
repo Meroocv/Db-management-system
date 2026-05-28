@@ -343,6 +343,7 @@ def novo_atendimento():
     if 'usuario' not in session:
         return jsonify({'erro': 'Usuario nao autenticado'}), 401
 
+    profissional = session.get('usuario')
     dados = request.get_json()
     prontuario = dados.get('prontuario', '').strip()
 
