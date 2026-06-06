@@ -1,6 +1,9 @@
 .menucompleto {
-    background-color: #f9fafe;
-    color: white;
+    min-height: 58px;
+    background: #ffffff;
+    color: #1f2937;
+    border-bottom: 1px solid #e6eaf0;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
 
 
@@ -33,6 +36,11 @@ body {
     font-family: Arial, sans-serif;
     background-color: #f4f6f8;
     margin: 0;
+}
+
+body > form {
+  width: min(92vw, 420px);
+  margin: 20px auto;
 }
 
         /* MENU SUPERIOR */
@@ -77,26 +85,29 @@ body {
             width: 100%;
             padding: 8px;
             margin-top: 5px;
+            box-sizing: border-box;
         }
 
-        .checkbox-group {
-            margin-top: 10px;
-        }
+.checkbox-group {
+    margin-top: 10px;
+}
 
         .checkbox-group label {
             font-weight: normal;
             display: block;
         }
 
-        .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 6px;
-        }
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 6px;
+    min-height: auto;
+}
 
         textarea {
             width: 100%;
             padding: 8px;
             margin-top: 5px;
+            box-sizing: border-box;
         }
 
 
@@ -116,9 +127,108 @@ body {
     margin: 5% auto;
     padding: 20px;
     width: 60%;
+    max-width: 920px;
     max-height: 85vh;
     overflow-y: auto;
     border-radius: 10px;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  min-height: 38px;
+}
+
+.modal-content input:focus,
+.modal-content select:focus,
+.modal-content textarea:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+  outline: none;
+}
+
+.modal-content textarea {
+  resize: vertical;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin-top: 16px;
+}
+
+.aba.form-grid[style*="block"],
+.aba.form-grid[style*="grid"] {
+  display: grid !important;
+}
+
+.campo {
+  grid-column: span 6;
+}
+
+.campo-largo {
+  grid-column: 1 / -1;
+}
+
+.campo-medio {
+  grid-column: span 6;
+}
+
+.campo-curto {
+  grid-column: span 3;
+}
+
+.campo-minimo {
+  grid-column: span 2;
+}
+
+.campo label,
+.campo-largo label,
+.campo-medio label,
+.campo-curto label,
+.campo-minimo label {
+  margin-top: 0;
+}
+
+.acoes-form {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.acoes-form button {
+  width: auto;
+  padding: 8px 14px;
+}
+
+.form-grid > br {
+  display: none;
+}
+
+.form-grid > button {
+  grid-column: 1 / -1;
+  justify-self: end;
+  width: auto;
+  padding: 8px 14px;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  .modal-content {
+    width: min(94vw, 720px);
+  }
+
+  .campo,
+  .campo-largo,
+  .campo-medio,
+  .campo-curto,
+  .campo-minimo {
+    grid-column: 1 / -1;
+  }
 }
 
 .fechar {
@@ -323,5 +433,9 @@ table{
   .perfil-topo {
     grid-template-columns: 1fr;
   }
+}
+
+.nav-icon{
+  width: 15%;
 }
 

@@ -7,27 +7,42 @@
 </head>
 <body>
 
+{% set rota_atual = request.path %}
+
 <!-- 🔝 MENU  -->
   <nav class="menucompleto navbar fixed-top">
     <div class="container-fluid">
-      <div class="sidebar sidebar-expanded container-fluid d-flex justify-content-start">
-        <button onclick="toggleSidebar() " onclick="toggleSidebar()" class="navbar-toggler" type="button">
-        <span class="navbar-toggler-icon"></span>
+      <div class="sidebar sidebar-expanded container-fluid d-flex justify-content-start align-items-center">
+        <button onclick="toggleSidebar()" class="navbar-toggler menu-toggle" type="button" aria-label="Abrir menu">
+          <span class="navbar-toggler-icon"></span>
         </button>
-        <div id="sidebarMenu"class="closed" tabindex="-1" aria-labelledby="offcanvasNavbarLabel">
-          <div>
-            <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+        <div id="sidebarMenu" class="closed" tabindex="-1" aria-labelledby="offcanvasNavbarLabel">
+          <div class="sidebar-panel">
+            
+
+            <ul class="navbar-nav sidebar-nav">
               <li class="nav-item">
-                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link {% if rota_atual == '/dashboard' %}active{% endif %}" href="/dashboard">
+                  <img src="../static/house_3661264.png" alt="" class="nav-icon">
+                  <span>Dashboard</span>
+                </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="/pacientes">Pacientes</a>
+                <a class="nav-link {% if rota_atual == '/pacientes' %}active{% endif %}" href="/pacientes">
+                  <img src="../static/medical-staff_12248967.png" alt="" class="nav-icon">
+                  <span>Pacientes</span>
+                </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="/atendimentos">Atendimentos</a>
+                <a class="nav-link {% if rota_atual == '/atendimentos' %}active{% endif %}" href="/atendimentos">
+                  <img src="../static/medical-report_18526763.png" alt="" class="nav-icon">
+                  <span>Atendimentos</span>
+                </a>
               </li>
-              <li class="nav-item">
-                <a class="nav-link" href="/logout">Sair</a>
+              <li class="nav-item sidebar-logout">
+                <a class="nav-link" href="/logout">
+                  <span>Sair</span>
+                </a>
               </li>
             </ul>
         </div>
@@ -136,7 +151,7 @@
 
     <!-- CONTEÚDO -->
 
-    <div id="identificacao" class="aba">
+    <div id="identificacao" class="aba form-grid">
       <input type="hidden" id="modo">
       <label>Prontuário:</label>
       <input id="prontuario" readonly>
@@ -157,7 +172,7 @@
       <input id="cns_paciente" inputmode="numeric" maxlength="15" readonly>
     </div>
 
-    <div id="familia" class="aba" style="display:none;">
+    <div id="familia" class="aba form-grid" style="display:none;">
       <label>Mãe:</label>
       <input id="nome_mae" readonly>
 
@@ -177,7 +192,7 @@
       <input id="telefone" type="tel" maxlength="15" placeholder="(00) 00000-0000" readonly>
     </div>
 
-    <div id="pessoal" class="aba" style="display:none;">
+    <div id="pessoal" class="aba form-grid" style="display:none;">
       <label>Data de Nascimento:</label>
       <input id="data_nascimento" type="date" required readonly>
 
@@ -224,7 +239,7 @@
       <input id="orientacao_religiosa" readonly>
     </div>
 
-    <div id="endereco" class="aba" style="display:none;">
+    <div id="endereco" class="aba form-grid" style="display:none;">
       <label>Município:</label>
       <input id="municipio" readonly>
 
@@ -283,7 +298,7 @@
       <input id="complemento" readonly>
     </div>
 
-    <div id="status" class="aba" style="display:none;">
+    <div id="status" class="aba form-grid" style="display:none;">
       <label>Status:</label>
       <select id="statusPaciente" disabled>
         <option value="">Selecione</option>

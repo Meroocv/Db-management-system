@@ -22,6 +22,60 @@ document.querySelectorAll(".idade").forEach(td => {
   td.innerText = idade ? idade + " anos" : "";
 });
 
+function organizarCamposDosModais() {
+    const classesPorCampo = {
+        prontuario: 'campo-curto',
+        cpf: 'campo-curto',
+        rg: 'campo-curto',
+        cns_paciente: 'campo-medio',
+        data_nascimento: 'campo-curto',
+        sexo: 'campo-curto',
+        naturalidade: 'campo-medio',
+        raca_cor: 'campo-curto',
+        escolaridade: 'campo-medio',
+        etnia: 'campo-curto',
+        orientacao_religiosa: 'campo-medio',
+        grau_parentesco_responsavel: 'campo-medio',
+        telefone_responsavel: 'campo-curto',
+        telefone: 'campo-curto',
+        municipio: 'campo-medio',
+        uf: 'campo-minimo',
+        zona: 'campo-curto',
+        cep: 'campo-curto',
+        numero: 'campo-minimo',
+        statusPaciente: 'campo-curto',
+        cid: 'campo-curto',
+        data_admissao: 'campo-curto',
+        data_conclusao: 'campo-curto',
+        prontuario_atendimento: 'campo-curto',
+        data_atendimento: 'campo-curto',
+        acolhimento_24h: 'campo-curto',
+        paciente_aceitou: 'campo-curto',
+        atendimento_id: 'campo-curto'
+    };
+
+    document.querySelectorAll('.form-grid').forEach(grid => {
+        if (grid.dataset.camposOrganizados === 'true') return;
+
+        Array.from(grid.querySelectorAll(':scope > label')).forEach(label => {
+            const control = label.nextElementSibling;
+            if (!control || !control.matches('input, select, textarea, .checkbox-group')) return;
+
+            const wrapper = document.createElement('div');
+            const controlId = control.id || '';
+            wrapper.className = classesPorCampo[controlId] || (control.tagName === 'TEXTAREA' || control.classList.contains('checkbox-group') ? 'campo-largo' : 'campo-medio');
+
+            grid.insertBefore(wrapper, label);
+            wrapper.appendChild(label);
+            wrapper.appendChild(control);
+        });
+
+        grid.dataset.camposOrganizados = 'true';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', organizarCamposDosModais);
+
 function abrirPaciente(btn, modo) {
 
     let dados = {
@@ -161,7 +215,8 @@ function abrirAba(aba, link) {
         div.style.display = 'none';
     });
 
-    document.getElementById(aba).style.display = 'block';
+    const abaSelecionada = document.getElementById(aba);
+    abaSelecionada.style.display = abaSelecionada.classList.contains('form-grid') ? 'grid' : 'block';
 
     document.querySelectorAll('#modalPaciente .nav-link').forEach(nav => {
         nav.classList.remove('active');
@@ -270,7 +325,7 @@ function fecharModal() {
     });
 
     // mostra identificação
-    document.getElementById('identificacao').style.display = 'block';
+    document.getElementById('identificacao').style.display = 'grid';
 
     // reseta aba ativa
     document.querySelectorAll('#modalPaciente .nav-link').forEach(link => {
@@ -326,7 +381,19 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
     
-function abrirModalAtendimento() {
+function marcarProcedimentosAtendimento(procedimentos) {
+    const selecionados = (procedimentos || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+
+    document.querySelectorAll('input[name="procedimentos_atendimento"]')
+        .forEach(input => {
+            input.checked = selecionados.includes(input.value);
+        });
+}
+
+function abrirModalAtendimento(botao = null) {
     const modal = document.getElementById('modalAtendimento');
     if (!modal) return;
 
@@ -339,8 +406,28 @@ function abrirModalAtendimento() {
             }
         });
 
-    const data = document.getElementById('data_atendimento');
-    if (data) data.value = new Date().toISOString().slice(0, 10);
+    const modo = botao ? 'edit' : 'novo';
+    document.getElementById('modo_atendimento').value = modo;
+    document.getElementById('atendimento_id').value = botao?.dataset.id || '';
+
+    const titulo = document.getElementById('tituloModalAtendimento');
+    if (titulo) titulo.innerText = modo === 'edit' ? 'Editar Atendimento' : 'Registrar Atendimento';
+
+    const botaoSalvar = document.getElementById('btnSalvarAtendimento');
+    if (botaoSalvar) botaoSalvar.innerText = modo === 'edit' ? 'Salvar alterações' : 'Salvar Atendimento';
+
+    if (botao) {
+        document.getElementById('prontuario_atendimento').value = botao.dataset.prontuario || '';
+        document.getElementById('nome_paciente_atendimento').value = botao.dataset.nomePaciente || '';
+        document.getElementById('data_atendimento').value = botao.dataset.dataAtendimento || '';
+        document.getElementById('acolhimento_24h').value = botao.dataset.acolhimento24h || '';
+        document.getElementById('paciente_aceitou').value = botao.dataset.pacienteAceitou || '';
+        document.getElementById('observacoes_atendimento').value = botao.dataset.observacoes || '';
+        marcarProcedimentosAtendimento(botao.dataset.procedimentos);
+    } else {
+        const data = document.getElementById('data_atendimento');
+        if (data) data.value = new Date().toISOString().slice(0, 10);
+    }
 
     modal.style.display = 'block';
     document.getElementById('prontuario_atendimento')?.focus();
@@ -353,14 +440,15 @@ function fecharModalAtendimento() {
 
 function salvarAtendimento() {
     const valor = (id) => document.getElementById(id)?.value || '';
+    const modo = valor('modo_atendimento') || 'novo';
     const procedimentos = Array.from(document.querySelectorAll('input[name="procedimentos_atendimento"]:checked'))
         .map(input => input.value)
         .join(', ');
 
     const dados = {
+        id: valor('atendimento_id'),
         prontuario: valor('prontuario_atendimento'),
         data_atendimento: valor('data_atendimento'),
-        profissional: valor('profissional_atendimento'),
         procedimentos,
         acolhimento_24h: valor('acolhimento_24h'),
         paciente_aceitou: valor('paciente_aceitou'),
@@ -379,18 +467,14 @@ function salvarAtendimento() {
         return;
     }
 
-    if (!dados.profissional.trim()) {
-        alert("Informe o profissional.");
-        document.getElementById('profissional_atendimento')?.focus();
-        return;
-    }
-
     if (!dados.procedimentos) {
         alert("Selecione pelo menos um procedimento.");
         return;
     }
 
-    fetch('/novo_atendimento', {
+    const url = modo === 'edit' ? '/atualizar_atendimento' : '/novo_atendimento';
+
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados)
@@ -400,7 +484,7 @@ function salvarAtendimento() {
         return data;
     }))
     .then(data => {
-        alert(data.mensagem || "Atendimento cadastrado!");
+        alert(data.mensagem || "Atendimento salvo!");
         fecharModalAtendimento();
         location.reload();
     })

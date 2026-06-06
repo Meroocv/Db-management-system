@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, redirect, render_template, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -37,6 +38,20 @@ def conectar_rh():
     conn = sqlite3.connect('rh.db', timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def init_database():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(atendimentos)")
+    colunas = {coluna[1] for coluna in cursor.fetchall()}
+
+    if 'servidor_id' not in colunas:
+        cursor.execute("ALTER TABLE atendimentos ADD COLUMN servidor_id INTEGER")
+
+    conn.commit()
+    conn.close()
 
 
 def foto_permitida(nome_arquivo):
@@ -309,6 +324,9 @@ def cadastrar_usuario():
 def atendimentos():
     if 'usuario' not in session:
         return redirect('/')
+
+    init_database()
+    usuario_id = session.get('usuario_id')
     conn = conectar()
     cursor = conn.cursor()
 
@@ -322,11 +340,19 @@ def atendimentos():
             a.procedimentos,
             a.acolhimento_24h,
             a.paciente_aceitou,
-            a.observacoes
+            a.observacoes,
+            a.servidor_id,
+            CASE
+                WHEN a.servidor_id = ?
+                 AND datetime(a.created_at) >= datetime('now', '-10 days')
+                THEN 1
+                ELSE 0
+            END AS pode_editar,
+            a.created_at
         FROM atendimentos a
         LEFT JOIN pacientes p ON p.prontuario = a.prontuario
         ORDER BY a.data_atendimento DESC, a.id DESC
-    """)
+    """, (usuario_id,))
     atendimentos = cursor.fetchall()
     prontuarios_atendidos = len({atendimento[1] for atendimento in atendimentos})
 
@@ -343,6 +369,7 @@ def novo_atendimento():
     if 'usuario' not in session:
         return jsonify({'erro': 'Usuario nao autenticado'}), 401
 
+    init_database()
     dados = request.get_json()
     prontuario = dados.get('prontuario', '').strip()
 
@@ -368,17 +395,18 @@ def novo_atendimento():
         cursor.execute("""
             INSERT INTO atendimentos (
                 prontuario, data_atendimento, profissional, procedimentos,
-                acolhimento_24h, paciente_aceitou, observacoes
+                acolhimento_24h, paciente_aceitou, observacoes, servidor_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             paciente[0],
             dados.get('data_atendimento'),
-            dados.get('profissional'),
+            session.get('usuario'),
             dados.get('procedimentos'),
             dados.get('acolhimento_24h'),
             dados.get('paciente_aceitou'),
-            dados.get('observacoes')
+            dados.get('observacoes'),
+            session.get('usuario_id')
         ))
 
         conn.commit()
@@ -388,6 +416,87 @@ def novo_atendimento():
 
     except Exception as e:
         print("ERRO INSERT ATENDIMENTO:", e)
+        return jsonify({'erro': str(e)}), 500
+
+
+@app.route('/atualizar_atendimento', methods=['POST'])
+def atualizar_atendimento():
+    if 'usuario' not in session:
+        return jsonify({'erro': 'Usuario nao autenticado'}), 401
+
+    init_database()
+    dados = request.get_json()
+    atendimento_id = dados.get('id')
+    prontuario = dados.get('prontuario', '').strip()
+
+    if not atendimento_id:
+        return jsonify({'erro': 'Atendimento nao informado'}), 400
+
+    if not prontuario:
+        return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
+
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, servidor_id, created_at
+            FROM atendimentos
+            WHERE id=?
+        """, (atendimento_id,))
+        atendimento = cursor.fetchone()
+
+        if not atendimento:
+            conn.close()
+            return jsonify({'erro': 'Atendimento nao encontrado'}), 404
+
+        if atendimento[1] != session.get('usuario_id'):
+            conn.close()
+            return jsonify({'erro': 'Voce so pode editar atendimentos criados por voce'}), 403
+
+        criado_em = datetime.fromisoformat(atendimento[2])
+        if datetime.now() - criado_em > timedelta(days=10):
+            conn.close()
+            return jsonify({'erro': 'O prazo de 10 dias para editar este atendimento expirou'}), 403
+
+        cursor.execute("""
+            SELECT prontuario
+            FROM pacientes
+            WHERE ltrim(prontuario, '0') = ?
+        """, (prontuario.lstrip('0'),))
+
+        paciente = cursor.fetchone()
+
+        if not paciente:
+            conn.close()
+            return jsonify({'erro': 'Paciente nao encontrado'}), 404
+
+        cursor.execute("""
+            UPDATE atendimentos
+            SET prontuario=?,
+                data_atendimento=?,
+                procedimentos=?,
+                acolhimento_24h=?,
+                paciente_aceitou=?,
+                observacoes=?
+            WHERE id=?
+        """, (
+            paciente[0],
+            dados.get('data_atendimento'),
+            dados.get('procedimentos'),
+            dados.get('acolhimento_24h'),
+            dados.get('paciente_aceitou'),
+            dados.get('observacoes'),
+            atendimento_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'mensagem': 'Atendimento atualizado com sucesso!'})
+
+    except Exception as e:
+        print("ERRO UPDATE ATENDIMENTO:", e)
         return jsonify({'erro': str(e)}), 500
 
 
@@ -618,6 +727,7 @@ def buscar_paciente():
     return jsonify({"erro": "Paciente nao encontrado"}), 404
 
 
+init_database()
 init_rh_database()
 
 

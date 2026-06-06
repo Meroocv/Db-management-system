@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS atendimentos (
     prontuario INTEGER NOT NULL,
     data_atendimento TEXT NOT NULL,
     profissional TEXT NOT NULL,
+    servidor_id INTEGER,
     procedimentos TEXT NOT NULL,
     acolhimento_24h TEXT,
     paciente_aceitou TEXT,

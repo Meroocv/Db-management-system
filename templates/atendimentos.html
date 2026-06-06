@@ -46,6 +46,7 @@
             <th class="text-center">PROCEDIMENTOS</th>
             <th class="text-center">ACOLHIMENTO</th>
             <th class="text-center">ACEITOU</th>
+            <th class="text-center">AÇÕES</th>
           </tr>
         </thead>
 
@@ -62,10 +63,30 @@
             <td class="text-center">{{ a[5] }}</td>
             <td class="text-center">{{ a[6] }}</td>
             <td class="text-center">{{ a[7] }}</td>
+            <td class="text-center">
+              {% if a[10] %}
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary"
+                onclick="abrirModalAtendimento(this)"
+                data-id="{{ a[0] }}"
+                data-prontuario="{{ a[1] }}"
+                data-nome-paciente="{{ a[2] or '' }}"
+                data-data-atendimento="{{ a[3] }}"
+                data-procedimentos="{{ a[5] }}"
+                data-acolhimento-24h="{{ a[6] }}"
+                data-paciente-aceitou="{{ a[7] }}"
+                data-observacoes="{{ a[8] or '' }}">
+                Editar
+              </button>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted">Nenhum atendimento cadastrado.</td>
+            <td colspan="9" class="text-center text-muted">Nenhum atendimento cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -77,9 +98,12 @@
 <div id="modalAtendimento" class="modal">
   <div class="modal-content">
     <span class="close" onclick="fecharModalAtendimento()">&times;</span>
-    <h2>Registrar Atendimento</h2>
+    <h2 id="tituloModalAtendimento">Registrar Atendimento</h2>
 
-    <div>
+    <div class="form-grid">
+      <input type="hidden" id="modo_atendimento" value="novo">
+      <input type="hidden" id="atendimento_id">
+
       <label>Prontuario:</label>
       <input type="text" id="prontuario_atendimento" inputmode="numeric" required>
 
@@ -88,9 +112,6 @@
 
       <label>Data:</label>
       <input type="date" id="data_atendimento" required>
-
-      <label>Profissional:</label>
-      <input type="text" id="profissional_atendimento" maxlength="120" required>
 
       <label>Procedimentos:</label>
       <div class="checkbox-group">
