@@ -39,14 +39,12 @@
         <thead>
           <tr>
             <th class="text-center">ID</th>
-            <th class="text-center">PRONT.</th>
-            <th class="text-center">PACIENTE</th>
-            <th class="text-center">DATA</th>
-            <th class="text-center">PROFISSIONAL</th>
-            <th class="text-center">PROCEDIMENTOS</th>
-            <th class="text-center">ACOLHIMENTO</th>
-            <th class="text-center">ACEITOU</th>
-            <th class="text-center">AÇÕES</th>
+            <th class="text-center" style="max-width: 40px">PRONT.</th>
+            <th class="text-center" style="max-width: 120px">PACIENTE</th>
+            <th class="text-center" style="max-width: 50px">DATA</th>
+            <th class="text-center" style="max-width: 120px">PROFISSIONAL</th>
+            <th class="text-center" style="max-width: 100px">PROCEDIMENTOS</th>
+            <th class="text-center" style="max-width: 40px">AÇÕES</th>
           </tr>
         </thead>
 
@@ -60,9 +58,13 @@
             </td>
             <td class="text-center">{{ a[3] }}</td>
             <td class="text-center">{{ a[4] }}</td>
-            <td class="text-center">{{ a[5] }}</td>
-            <td class="text-center">{{ a[6] }}</td>
-            <td class="text-center">{{ a[7] }}</td>
+            <td class="text-center">
+              <div class="truncate-2-lines">
+                {{ a[5] }}
+              </div>
+            </td>
+            
+            
             <td class="text-center">
               {% if a[10] %}
               <button
@@ -74,8 +76,6 @@
                 data-nome-paciente="{{ a[2] or '' }}"
                 data-data-atendimento="{{ a[3] }}"
                 data-procedimentos="{{ a[5] }}"
-                data-acolhimento-24h="{{ a[6] }}"
-                data-paciente-aceitou="{{ a[7] }}"
                 data-observacoes="{{ a[8] or '' }}">
                 Editar
               </button>
@@ -83,6 +83,8 @@
               <span class="text-muted">-</span>
               {% endif %}
             </td>
+            
+
           </tr>
           {% else %}
           <tr>
@@ -115,10 +117,17 @@
 
       <label>Procedimentos:</label>
       <div class="checkbox-group">
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento"> Acolhimento</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual"> Atendimento Individual</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar"> Visita Domiciliar</label>
-        <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo"> Atividade em Grupo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento inicial">Acolhimento Inicial</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento Diurno">Acolhimento Diurno</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual">Atendimento Individual</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento em Grupo">Atendimento em Grupo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Familiar">Atendimento Familiar</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar">Visita Domiciliar</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Articulação de Rede">Articulação de Rede</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Fortalecimento do Protagonismo">Fortalecimento do Protagonismo</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Corporais">Práticas Corporais</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Expressivas">Práticas Expressivas</label>
+        <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo">Atividade em Grupo</label>
         <label><input type="checkbox" name="procedimentos_atendimento" value="Falta"> Falta</label>
       </div>
 
