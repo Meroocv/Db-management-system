@@ -5,6 +5,7 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>Atendimentos</h3>
   </div>
+  
   <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="card mb-4 shadow-sm border-0">
       <div class="card-body">
@@ -33,9 +34,10 @@
         <button class="btn btn-primary" onclick="abrirModalAtendimento()">+ Novo atendimento</button>
     </div>
   </div>
+
   <div class="container-fluid">
     <div class="table-responsive">
-      <table class="table table-striped">
+      <table class="table table-striped align-middle">
         <thead>
           <tr>
             <th class="text-center">ID</th>
@@ -51,44 +53,41 @@
         <tbody>
           {% for a in atendimentos %}
           <tr>
-            <td class="text-center">{{ a[0] }}</td>
-            <td class="text-center">{{ a[1] }}</td>
+            <td class="text-center">{{ a.id }}</td>
+            <td class="text-center">{{ a.prontuario }}</td>
             <td class="text-center">
-              <strong>{{ a[2] or 'Paciente nao encontrado' }}</strong>
+              <strong>{{ a.nome_paciente or 'Paciente nao encontrado' }}</strong>
             </td>
-            <td class="text-center">{{ a[3] }}</td>
-            <td class="text-center">{{ a[4] }}</td>
+            <td class="text-center">{{ a.data }}</td>
+            <td class="text-center">{{ a.profissional }}</td>
             <td class="text-center">
               <div class="truncate-2-lines">
-                {{ a[5] }}
+                {{ a.procedimentos }}
               </div>
             </td>
             
-            
             <td class="text-center">
-              {% if a[10] %}
+              {% if a.pode_editar %}
               <button
                 type="button"
                 class="btn btn-sm btn-outline-primary"
                 onclick="abrirModalAtendimento(this)"
-                data-id="{{ a[0] }}"
-                data-prontuario="{{ a[1] }}"
-                data-nome-paciente="{{ a[2] or '' }}"
-                data-data-atendimento="{{ a[3] }}"
-                data-procedimentos="{{ a[5] }}"
-                data-observacoes="{{ a[8] or '' }}">
+                data-id="{{ a.id }}"
+                data-prontuario="{{ a.prontuario }}"
+                data-nome-paciente="{{ a.nome_paciente or '' }}"
+                data-data-atendimento="{{ a.data }}"
+                data-procedimentos="{{ a.procedimentos }}"
+                data-observacoes="{{ a.observacoes or '' }}">
                 Editar
               </button>
               {% else %}
               <span class="text-muted">-</span>
               {% endif %}
             </td>
-            
-
           </tr>
           {% else %}
           <tr>
-            <td colspan="9" class="text-center text-muted">Nenhum atendimento cadastrado.</td>
+            <td colspan="7" class="text-center text-muted">Nenhum atendimento cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>

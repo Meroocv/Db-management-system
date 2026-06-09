@@ -423,6 +423,10 @@ table{
   padding: 8px 14px;
 }
 
+.acao{
+  padding: 4px 8px;
+}
+
 .truncate-2-lines {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -454,4 +458,10 @@ table{
 
 .table-responsive{
   min-width: 800px;
+}
+
+.table td, 
+.table th{
+    max-height: 100px;
+    height: 45px; /* altura padrão */
 }

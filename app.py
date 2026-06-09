@@ -1,17 +1,127 @@
 import os
 import re
-import sqlite3
 from datetime import datetime, timedelta
 
-from flask import Flask, jsonify, redirect, render_template, request, session
+from flask import Flask, jsonify, redirect, render_template, request, session, send_file
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from sqlalchemy import func, case, and_
+from wtforms import StringField, SubmitField
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from docxtpl import DocxTemplate
+import io
 
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.secret_key = 'um_segredo_bem_forte_123456'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'perfis')
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# ==========================================
+# MODELOS ALCHEMY (TABELAS)
+# ==========================================
+
+class Paciente(db.Model):
+    __tablename__ = 'pacientes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    prontuario = db.Column(db.String(20), unique=True, nullable=False)
+    nome_paciente = db.Column(db.String(100), nullable=False)
+    nome_social = db.Column(db.String(100))
+    cpf = db.Column(db.String(14))
+    rg = db.Column(db.String(20))
+    cns_paciente = db.Column(db.String(20))
+    data_nascimento = db.Column(db.String(10))
+    sexo = db.Column(db.String(10))
+    naturalidade = db.Column(db.String(50))
+    raca_cor = db.Column(db.String(50))
+    escolaridade = db.Column(db.String(50))
+    etnia = db.Column(db.String(50))
+    orientacao_religiosa = db.Column(db.String(50))
+    nome_mae = db.Column(db.String(100))
+    nome_pai = db.Column(db.String(100))
+    nome_responsavel = db.Column(db.String(100))
+    grau_parentesco_responsavel = db.Column(db.String(50))
+    telefone_responsavel = db.Column(db.String(20))
+    municipio = db.Column(db.String(50))
+    uf = db.Column(db.String(2))
+    zona = db.Column(db.String(20))
+    cep = db.Column(db.String(10))
+    bairro = db.Column(db.String(50))
+    logradouro = db.Column(db.String(100))
+    numero = db.Column(db.String(10))
+    complemento = db.Column(db.String(50))
+    statusPaciente = db.Column(db.String(20))
+    terapeuta_referencia = db.Column(db.String(100))
+    cid = db.Column(db.String(20))
+    data_admissao = db.Column(db.String(10))
+    data_conclusao = db.Column(db.String(10))
+    
+    # Campos adicionais identificados nas rotas de atualização
+    tipo = db.Column(db.String(50))
+    ddd = db.Column(db.String(5))
+    telefone = db.Column(db.String(20))
+    origem_paciente = db.Column(db.String(100))
+    especificacao_origem = db.Column(db.String(100))
+    cnes_usf = db.Column(db.String(20))
+
+    def __repr__(self):
+        return f"<Paciente {self.nome_paciente} (Prontuario: {self.prontuario})>"
+
+
+class Servidor(db.Model):
+    __tablename__ = 'servidores'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cnes = db.Column(db.String(20), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    cbo = db.Column(db.String(20), nullable=False)
+    cpf = db.Column(db.String(14), unique=True, nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    senha = db.Column(db.String(255), nullable=False)
+    foto_perfil = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    updated_at = db.Column(db.DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+
+class SolicitacaoCBO(db.Model):
+    __tablename__ = 'solicitacoes_cbo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
+    cbo_atual = db.Column(db.String(20), nullable=False)
+    cbo_solicitado = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20), default='pendente', nullable=False)
+    aprovado_por = db.Column(db.Integer, db.ForeignKey('servidores.id'))
+    criado_em = db.Column(db.DateTime, default=func.current_timestamp())
+    analisado_em = db.Column(db.DateTime)
+
+
+class Atendimento(db.Model):
+    __tablename__ = 'atendimentos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    prontuario = db.Column(db.String(20), nullable=False)
+    data_atendimento = db.Column(db.String(10))
+    profissional = db.Column(db.String(100))
+    procedimentos = db.Column(db.Text)
+    acolhimento_24h = db.Column(db.String(20))
+    paciente_aceitou = db.Column(db.String(20))
+    observacoes = db.Column(db.Text)
+    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'))
+    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+
+
+# ==========================================
+# CONFIGURAÇÕES E AUXILIARES
+# ==========================================
 
 CBO_OPCOES = {
     "411010": "Assistente em Administracao",
@@ -29,105 +139,16 @@ CBO_OPCOES = {
 }
 EXTENSOES_FOTO = {"png", "jpg", "jpeg", "webp"}
 
-
-def conectar():
-    return sqlite3.connect('database.db', timeout=10)
-
-
-def conectar_rh():
-    conn = sqlite3.connect('rh.db', timeout=10)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_database():
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("PRAGMA table_info(atendimentos)")
-    colunas = {coluna[1] for coluna in cursor.fetchall()}
-
-    if 'servidor_id' not in colunas:
-        cursor.execute("ALTER TABLE atendimentos ADD COLUMN servidor_id INTEGER")
-
-    conn.commit()
-    conn.close()
-
-
 def foto_permitida(nome_arquivo):
-    return (
-        '.' in nome_arquivo and
-        nome_arquivo.rsplit('.', 1)[1].lower() in EXTENSOES_FOTO
-    )
-
-
-def init_rh_database():
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    conn = conectar_rh()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS servidores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cnes TEXT NOT NULL,
-            name TEXT NOT NULL,
-            cbo TEXT NOT NULL,
-            cpf TEXT NOT NULL UNIQUE,
-            email TEXT NOT NULL,
-            senha TEXT NOT NULL,
-            foto_perfil TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS solicitacoes_cbo (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            servidor_id INTEGER NOT NULL,
-            cbo_atual TEXT NOT NULL,
-            cbo_solicitado TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pendente',
-            aprovado_por INTEGER,
-            criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
-            analisado_em DATETIME,
-            FOREIGN KEY (servidor_id) REFERENCES servidores (id),
-            FOREIGN KEY (aprovado_por) REFERENCES servidores (id)
-        )
-    """)
-
-    try:
-        legado = conectar()
-        legado_cursor = legado.cursor()
-        legado_cursor.execute("SELECT cnes, name, cbo, cpf, email, senha FROM usuarios")
-        for usuario in legado_cursor.fetchall():
-            cursor.execute("""
-                INSERT OR IGNORE INTO servidores (cnes, name, cbo, cpf, email, senha)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, usuario)
-        legado.close()
-    except sqlite3.Error:
-        pass
-
-    conn.commit()
-    conn.close()
-
+    return '.' in nome_arquivo and nome_arquivo.rsplit('.', 1)[1].lower() in EXTENSOES_FOTO
 
 def servidor_logado():
     if 'usuario_id' not in session:
         return None
-
-    conn = conectar_rh()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM servidores WHERE id=?", (session['usuario_id'],))
-    servidor = cursor.fetchone()
-    conn.close()
-    return servidor
-
+    return Servidor.query.get(session['usuario_id'])
 
 def pode_aprovar_rh():
     return session.get('usuario_cbo') == '411010'
-
 
 def contexto_usuario():
     servidor = servidor_logado()
@@ -140,6 +161,10 @@ def contexto_usuario():
     }
 
 
+# ==========================================
+# ROTAS DA APLICAÇÃO
+# ==========================================
+
 @app.route('/')
 def login():
     return render_template('login.html')
@@ -150,17 +175,13 @@ def logar():
     user = request.form.get('cpf')
     senha = request.form.get('senha')
 
-    conn = conectar_rh()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM servidores WHERE cpf=?", (user,))
-    usuario = cursor.fetchone()
-    conn.close()
+    usuario = Servidor.query.filter_by(cpf=user).first()
 
-    if usuario and check_password_hash(usuario['senha'], senha):
-        session['usuario_id'] = usuario['id']
-        session['usuario'] = usuario['name']
-        session['usuario_cbo'] = usuario['cbo']
-        session['usuario_foto'] = usuario['foto_perfil']
+    if usuario and check_password_hash(usuario.senha, senha):
+        session['usuario_id'] = usuario.id
+        session['usuario'] = usuario.name
+        session['usuario_cbo'] = usuario.cbo
+        session['usuario_foto'] = usuario.foto_perfil
         return redirect('/dashboard')
 
     return render_template('login.html', erro="CPF ou senha invalidos")
@@ -171,22 +192,17 @@ def dashboard():
     if 'usuario' not in session:
         return redirect('/')
 
-    solicitacoes_cbo = []
+    solicitacoes_pendentes = []
     if pode_aprovar_rh():
-        conn = conectar_rh()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT sc.id, s.name, s.cpf, sc.cbo_atual, sc.cbo_solicitado, sc.criado_em
-            FROM solicitacoes_cbo sc
-            JOIN servidores s ON s.id = sc.servidor_id
-            WHERE sc.status = 'pendente'
-            ORDER BY sc.criado_em ASC
-        """)
-        solicitacoes_cbo = cursor.fetchall()
-        conn.close()
+        solicitacoes_pendentes = db.session.query(
+            SolicitacaoCBO.id, Servidor.name, Servidor.cpf,
+            SolicitacaoCBO.cbo_atual, SolicitacaoCBO.cbo_solicitado, SolicitacaoCBO.criado_em
+        ).join(Servidor, Servidor.id == SolicitacaoCBO.servidor_id)\
+         .filter(SolicitacaoCBO.status == 'pendente')\
+         .order_by(SolicitacaoCBO.criado_em.asc()).all()
 
     contexto = contexto_usuario()
-    contexto['solicitacoes_cbo'] = solicitacoes_cbo
+    contexto['solicitacoes_cbo'] = solicitacoes_pendentes
     return render_template('dashboard.html', **contexto)
 
 
@@ -194,78 +210,94 @@ def dashboard():
 def pacientes():
     if 'usuario' not in session:
         return redirect('/')
-    conn = conectar()
-    cursor = conn.cursor()
+    
+    # 1. Captura os parâmetros do filtro dinâmico enviados pelo formulário HTML
+    tipo_busca = request.args.get('tipo_busca')
+    termo = request.args.get('termo', '').strip()
+    
+    # Iniciamos a query base
+    query = Paciente.query
+    
+    # 2. Se houver um termo digitado, aplica o filtro na coluna selecionada
+    if termo:
+        if tipo_busca == 'nome_paciente':
+            # Busca por partes do nome (LIKE), ignorando maiúsculas e minúsculas
+            query = query.filter(Paciente.nome_paciente.ilike(f"%{termo}%"))
+        elif tipo_busca == 'prontuario':
+            # Busca pelo início ou valor exato do prontuário
+            query = query.filter(Paciente.prontuario.like(f"%{termo}%"))
+        elif tipo_busca == 'cpf':
+            # Busca por partes do CPF
+            query = query.filter(Paciente.cpf.like(f"%{termo}%"))
 
-    cursor.execute("SELECT * FROM pacientes")
-    pacientes = cursor.fetchall()
+        elif tipo_busca == 'raca_cor':
+            # Busca por partes da raça/cor
+            query = query.filter(Paciente.raca_cor.ilike(f"%{termo}%"))
 
-    conn.close()
-
+    if query is None:
+        return render_template('pacientes.html', **contexto_usuario(), pacientes=["Nenhum paciente encontrado."])
+            
+    # Executa a query filtrada ou traz todos (.all()) se o filtro estiver vazio
+    lista_pacientes = query.all()
+    
+    # 3. Monta o contexto padrão do sistema (dados do usuário logado, foto, etc.)
     contexto = contexto_usuario()
-    contexto['pacientes'] = pacientes
+    contexto['pacientes'] = lista_pacientes
+    
     return render_template('pacientes.html', **contexto)
 
 
 @app.route('/novo_paciente', methods=['POST'])
 def novo_paciente():
-    dados = request.json
+    dados = request.get_json(silent=True) 
 
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
+    if not dados:
+        return jsonify({"erro": "Os dados não foram enviados no formato JSON correto."}), 400
 
-    cursor.execute("""
-        INSERT INTO pacientes (
-            nome_paciente, nome_social, cpf, rg, cns_paciente,
-            data_nascimento, sexo, naturalidade, raca_cor,
-            escolaridade, etnia, orientacao_religiosa,
-            nome_mae, nome_pai, nome_responsavel,
-            grau_parentesco_responsavel, telefone_responsavel,
-            telefone, municipio, uf, zona, cep, bairro,
-            logradouro, numero, complemento,
-            statusPaciente, terapeuta_referencia,
-            cid, data_admissao, data_conclusao
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        dados.get('nome_paciente'),
-        dados.get('nome_social'),
-        dados.get('cpf'),
-        dados.get('rg'),
-        dados.get('cns_paciente'),
-        dados.get('data_nascimento'),
-        dados.get('sexo'),
-        dados.get('naturalidade'),
-        dados.get('raca_cor'),
-        dados.get('escolaridade'),
-        dados.get('etnia'),
-        dados.get('orientacao_religiosa'),
-        dados.get('nome_mae'),
-        dados.get('nome_pai'),
-        dados.get('nome_responsavel'),
-        dados.get('grau_parentesco_responsavel'),
-        dados.get('telefone_responsavel'),
-        dados.get('telefone'),
-        dados.get('municipio'),
-        dados.get('uf'),
-        dados.get('zona'),
-        dados.get('cep'),
-        dados.get('bairro'),
-        dados.get('logradouro'),
-        dados.get('numero'),
-        dados.get('complemento'),
-        dados.get('statusPaciente'),
-        dados.get('terapeuta_referencia'),
-        dados.get('cid'),
-        dados.get('data_admissao'),
-        dados.get('data_conclusao')
-    ))
+    # Agora validamos APENAS o nome, já que o prontuário é automático
+    if not dados.get('nome_paciente'):
+        return jsonify({"erro": "O Nome do Paciente é um campo obrigatório."}), 400
 
-    conn.commit()
-    conn.close()
+    try:
+        novo = Paciente()
+        
+        # Preenche os campos vindos do front-end (exceto o prontuário por enquanto)
+        for campo, valor in dados.items():
+            if hasattr(novo, campo) and campo != 'prontuario':
+                setattr(novo, campo, valor)
 
-    return {"mensagem": "Paciente cadastrado com sucesso!"}
+        # LÓGICA DO PRONTUÁRIO AUTOMÁTICO:
+        # Se o front-end não enviou um prontuário, nós geramos o próximo número
+        if not dados.get('prontuario'):
+            # Busca o maior prontuário numérico existente no banco
+            ultimo_paciente = db.session.query(Paciente.prontuario)\
+                .order_by(func.cast(Paciente.prontuario, db.Integer).desc())\
+                .first()
+            
+            if ultimo_paciente and ultimo_paciente[0] and ultimo_paciente[0].isdigit():
+                proximo_numero = int(ultimo_paciente[0]) + 1
+                # .zfill(6) mantém o padrão de跟 zeros à esquerda (ex: 000042)
+                novo.prontuario = str(proximo_numero).zfill(6)
+            else:
+                novo.prontuario = "000001" # Caso seja o primeiríssimo paciente do banco
+        else:
+            novo.prontuario = str(dados.get('prontuario')).strip()
 
+        db.session.add(novo)
+        db.session.commit()
+        
+        # Retornamos o número gerado para você saber qual foi
+        return jsonify({
+            "mensagem": "Paciente cadastrado com sucesso!",
+            "prontuario": novo.prontuario
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print("\n=== ERRO NO BANCO DE DADOS EM NOVO_PACIENTE ===")
+        print(str(e))
+        print("================================================\n")
+        return jsonify({"erro": f"Erro interno ao salvar no banco: {str(e)}"}), 500
 
 @app.route('/cadastro')
 def cadastro():
@@ -281,43 +313,47 @@ def cadastrar_usuario():
     confirmar = request.form.get('confirmar_senha')
     cnes = request.form.get('cnes')
     cbo = request.form.get('cbo')
+
     if not cbo:
         return render_template('cadastro.html', erro="CBO e obrigatorio", cbo_opcoes=CBO_OPCOES)
-
     if senha != confirmar:
         return render_template('cadastro.html', erro="As senhas nao coincidem", cbo_opcoes=CBO_OPCOES)
-
     if len(senha) < 6:
         return render_template('cadastro.html', erro="Minimo 6 caracteres", cbo_opcoes=CBO_OPCOES)
+    if not re.search(r'[A-Z]', senha) or not re.search(r'[a-z]', senha) or not re.search(r'[0-9]', senha):
+        return render_template('cadastro.html', erro="Senha requer letra maiúscula, minúscula e número", cbo_opcoes=CBO_OPCOES)
 
-    if not re.search(r'[A-Z]', senha):
-        return render_template('cadastro.html', erro="Precisa de letra maiuscula", cbo_opcoes=CBO_OPCOES)
-
-    if not re.search(r'[a-z]', senha):
-        return render_template('cadastro.html', erro="Precisa de letra minuscula", cbo_opcoes=CBO_OPCOES)
-
-    if not re.search(r'[0-9]', senha):
-        return render_template('cadastro.html', erro="Precisa de numero", cbo_opcoes=CBO_OPCOES)
-
-    conn = conectar_rh()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM servidores WHERE cpf=?", (cpf,))
-    if cursor.fetchone():
-        conn.close()
+    if Servidor.query.filter_by(cpf=cpf).first():
         return render_template('cadastro.html', erro="CPF ja cadastrado", cbo_opcoes=CBO_OPCOES)
 
     senha_hash = generate_password_hash(senha)
-
-    cursor.execute("""
-        INSERT INTO servidores (name, cpf, email, senha, cnes, cbo)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (name, cpf, email, senha_hash, cnes, cbo))
-
-    conn.commit()
-    conn.close()
-
+    novo_servidor = Servidor(name=name, cpf=cpf, email=email, senha=senha_hash, cnes=cnes, cbo=cbo)
+    
+    db.session.add(novo_servidor)
+    db.session.commit()
     return redirect('/')
+
+@app.route('/paciente/<prontuario>/ficha_word')
+def gerar_ficha_word(prontuario):
+    paciente = db.session.query(Paciente).filter_by(prontuario=prontuario).first()
+    
+    # Abre o seu modelo do Word
+    doc = DocxTemplate("FICHA DE ACOLHIMENTO 5.docx")
+    
+    # Passa os dados do banco para dentro do arquivo
+    context = { 'p': paciente }
+    doc.render(context)
+    
+    # Salva o arquivo na memória para enviar para o navegador
+    file_stream = io.BytesIO()
+    doc.save(file_stream)
+    file_stream.seek(0)
+    
+    return send_file(
+        file_stream, 
+        as_attachment=True, 
+        download_name=f"Ficha_{paciente.nome_paciente}.docx"
+    )
 
 
 @app.route('/atendimentos')
@@ -325,41 +361,35 @@ def atendimentos():
     if 'usuario' not in session:
         return redirect('/')
 
-    init_database()
     usuario_id = session.get('usuario_id')
-    conn = conectar()
-    cursor = conn.cursor()
+    
+    # Define a regra condicional (CASE WHEN do SQL) usando SQLAlchemy expressions
+    pode_editar_condicao = case(
+        (and_(Atendimento.servidor_id == usuario_id, 
+              Atendimento.created_at >= datetime.utcnow() - timedelta(days=10)), 1),
+        else_=0
+    )
 
-    cursor.execute("""
-        SELECT
-            a.id,
-            a.prontuario,
-            p.nome_paciente,
-            a.data_atendimento,
-            a.profissional,
-            a.procedimentos,
-            a.acolhimento_24h,
-            a.paciente_aceitou,
-            a.observacoes,
-            a.servidor_id,
-            CASE
-                WHEN a.servidor_id = ?
-                 AND datetime(a.created_at) >= datetime('now', '-10 days')
-                THEN 1
-                ELSE 0
-            END AS pode_editar,
-            a.created_at
-        FROM atendimentos a
-        LEFT JOIN pacientes p ON p.prontuario = a.prontuario
-        ORDER BY a.data_atendimento DESC, a.id DESC
-    """, (usuario_id,))
-    atendimentos = cursor.fetchall()
-    prontuarios_atendidos = len({atendimento[1] for atendimento in atendimentos})
+    lista_atendimentos = db.session.query(
+        Atendimento.id,
+        Atendimento.prontuario,
+        Paciente.nome_paciente,
+        Atendimento.data_atendimento,
+        Atendimento.profissional,
+        Atendimento.procedimentos,
+        Atendimento.acolhimento_24h,
+        Atendimento.paciente_aceitou,
+        Atendimento.observacoes,
+        Atendimento.servidor_id,
+        pode_editar_condicao.label('pode_editar'),
+        Atendimento.created_at
+    ).join(Paciente, Paciente.prontuario == Atendimento.prontuario, isouter=True)\
+     .order_by(Atendimento.data_atendimento.desc(), Atendimento.id.desc()).all()
 
-    conn.close()
+    prontuarios_atendidos = len({atend.prontuario for atend in lista_atendimentos})
 
     contexto = contexto_usuario()
-    contexto['atendimentos'] = atendimentos
+    contexto['atendimentos'] = lista_atendimentos
     contexto['prontuarios_atendidos'] = prontuarios_atendidos
     return render_template('atendimentos.html', **contexto)
 
@@ -369,54 +399,32 @@ def novo_atendimento():
     if 'usuario' not in session:
         return jsonify({'erro': 'Usuario nao autenticado'}), 401
 
-    init_database()
     dados = request.get_json()
     prontuario = dados.get('prontuario', '').strip()
 
     if not prontuario:
         return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
 
-    try:
-        conn = conectar()
-        cursor = conn.cursor()
+    # Ltrim implementado nativamente via string no python ou no db.func.ltrim
+    paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
 
-        cursor.execute("""
-            SELECT prontuario
-            FROM pacientes
-            WHERE ltrim(prontuario, '0') = ?
-        """, (prontuario.lstrip('0'),))
+    if not paciente:
+        return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-        paciente = cursor.fetchone()
-
-        if not paciente:
-            conn.close()
-            return jsonify({'erro': 'Paciente nao encontrado'}), 404
-
-        cursor.execute("""
-            INSERT INTO atendimentos (
-                prontuario, data_atendimento, profissional, procedimentos,
-                acolhimento_24h, paciente_aceitou, observacoes, servidor_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            paciente[0],
-            dados.get('data_atendimento'),
-            session.get('usuario'),
-            dados.get('procedimentos'),
-            dados.get('acolhimento_24h'),
-            dados.get('paciente_aceitou'),
-            dados.get('observacoes'),
-            session.get('usuario_id')
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({'mensagem': 'Atendimento cadastrado com sucesso!'})
-
-    except Exception as e:
-        print("ERRO INSERT ATENDIMENTO:", e)
-        return jsonify({'erro': str(e)}), 500
+    novo = Atendimento(
+        prontuario=paciente.prontuario,
+        data_atendimento=dados.get('data_atendimento'),
+        profissional=session.get('usuario'),
+        procedimentos=dados.get('procedimentos'),
+        acolhimento_24h=dados.get('acolhimento_24h'),
+        paciente_aceitou=dados.get('paciente_aceitou'),
+        observacoes=dados.get('observacoes'),
+        servidor_id=session.get('usuario_id')
+    )
+    
+    db.session.add(novo)
+    db.session.commit()
+    return jsonify({'mensagem': 'Atendimento cadastrado com sucesso!'})
 
 
 @app.route('/atualizar_atendimento', methods=['POST'])
@@ -424,80 +432,37 @@ def atualizar_atendimento():
     if 'usuario' not in session:
         return jsonify({'erro': 'Usuario nao autenticado'}), 401
 
-    init_database()
     dados = request.get_json()
     atendimento_id = dados.get('id')
     prontuario = dados.get('prontuario', '').strip()
 
-    if not atendimento_id:
-        return jsonify({'erro': 'Atendimento nao informado'}), 400
+    if not atendimento_id or not prontuario:
+        return jsonify({'erro': 'Dados incompletos'}), 400
 
-    if not prontuario:
-        return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
+    atendimento = Atendimento.query.get(atendimento_id)
+    if not atendimento:
+        return jsonify({'erro': 'Atendimento nao encontrado'}), 404
 
-    try:
-        conn = conectar()
-        cursor = conn.cursor()
+    if atendimento.servidor_id != session.get('usuario_id'):
+        return jsonify({'erro': 'Voce so pode editar atendimentos criados por voce'}), 403
 
-        cursor.execute("""
-            SELECT id, servidor_id, created_at
-            FROM atendimentos
-            WHERE id=?
-        """, (atendimento_id,))
-        atendimento = cursor.fetchone()
+    # Verificação de prazo usando objetos datetime reais gerados pelo Alchemy
+    if datetime.utcnow() - atendimento.created_at > timedelta(days=10):
+        return jsonify({'erro': 'O prazo de 10 dias para editar este atendimento expirou'}), 403
 
-        if not atendimento:
-            conn.close()
-            return jsonify({'erro': 'Atendimento nao encontrado'}), 404
+    paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
+    if not paciente:
+        return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-        if atendimento[1] != session.get('usuario_id'):
-            conn.close()
-            return jsonify({'erro': 'Voce so pode editar atendimentos criados por voce'}), 403
+    atendimento.prontuario = paciente.prontuario
+    atendimento.data_atendimento = dados.get('data_atendimento')
+    atendimento.procedimentos = dados.get('procedimentos')
+    atendimento.acolhimento_24h = dados.get('acolhimento_24h')
+    atendimento.paciente_aceitou = dados.get('paciente_aceitou')
+    atendimento.observacoes = dados.get('observacoes')
 
-        criado_em = datetime.fromisoformat(atendimento[2])
-        if datetime.now() - criado_em > timedelta(days=10):
-            conn.close()
-            return jsonify({'erro': 'O prazo de 10 dias para editar este atendimento expirou'}), 403
-
-        cursor.execute("""
-            SELECT prontuario
-            FROM pacientes
-            WHERE ltrim(prontuario, '0') = ?
-        """, (prontuario.lstrip('0'),))
-
-        paciente = cursor.fetchone()
-
-        if not paciente:
-            conn.close()
-            return jsonify({'erro': 'Paciente nao encontrado'}), 404
-
-        cursor.execute("""
-            UPDATE atendimentos
-            SET prontuario=?,
-                data_atendimento=?,
-                procedimentos=?,
-                acolhimento_24h=?,
-                paciente_aceitou=?,
-                observacoes=?
-            WHERE id=?
-        """, (
-            paciente[0],
-            dados.get('data_atendimento'),
-            dados.get('procedimentos'),
-            dados.get('acolhimento_24h'),
-            dados.get('paciente_aceitou'),
-            dados.get('observacoes'),
-            atendimento_id
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({'mensagem': 'Atendimento atualizado com sucesso!'})
-
-    except Exception as e:
-        print("ERRO UPDATE ATENDIMENTO:", e)
-        return jsonify({'erro': str(e)}), 500
+    db.session.commit()
+    return jsonify({'mensagem': 'Atendimento atualizado com sucesso!'})
 
 
 @app.route('/atualizar_perfil', methods=['POST'])
@@ -515,48 +480,35 @@ def atualizar_perfil():
     if not nome or not email or not cnes:
         return redirect('/dashboard')
 
-    conn = conectar_rh()
-    cursor = conn.cursor()
-    foto_perfil = servidor['foto_perfil']
-
     if foto and foto.filename and foto_permitida(foto.filename):
         extensao = foto.filename.rsplit('.', 1)[1].lower()
-        nome_arquivo = secure_filename(f"servidor_{servidor['id']}.{extensao}")
+        nome_arquivo = secure_filename(f"servidor_{servidor.id}.{extensao}")
         caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
         foto.save(caminho)
-        foto_perfil = f"uploads/perfis/{nome_arquivo}"
+        servidor.foto_perfil = f"uploads/perfis/{nome_arquivo}"
 
-    cursor.execute("""
-        UPDATE servidores
-        SET name=?, email=?, cnes=?, foto_perfil=?, updated_at=CURRENT_TIMESTAMP
-        WHERE id=?
-    """, (nome, email, cnes, foto_perfil, servidor['id']))
+    servidor.name = nome
+    servidor.email = email
+    servidor.cnes = cnes
 
-    if cbo_solicitado and cbo_solicitado != servidor['cbo']:
-        cursor.execute("""
-            SELECT id
-            FROM solicitacoes_cbo
-            WHERE servidor_id=? AND status='pendente'
-        """, (servidor['id'],))
-        pendente = cursor.fetchone()
-
+    if cbo_solicitado and cbo_solicitado != servidor.cbo:
+        pendente = SolicitacaoCBO.query.filter_by(servidor_id=servidor.id, status='pendente').first()
         if pendente:
-            cursor.execute("""
-                UPDATE solicitacoes_cbo
-                SET cbo_atual=?, cbo_solicitado=?, criado_em=CURRENT_TIMESTAMP
-                WHERE id=?
-            """, (servidor['cbo'], cbo_solicitado, pendente['id']))
+            pendente.cbo_atual = servidor.cbo
+            pendente.cbo_solicitado = cbo_solicitado
+            pendente.criado_em = func.current_timestamp()
         else:
-            cursor.execute("""
-                INSERT INTO solicitacoes_cbo (servidor_id, cbo_atual, cbo_solicitado)
-                VALUES (?, ?, ?)
-            """, (servidor['id'], servidor['cbo'], cbo_solicitado))
+            nova_solicitacao = SolicitacaoCBO(
+                servidor_id=servidor.id,
+                cbo_atual=servidor.cbo,
+                cbo_solicitado=cbo_solicitado
+            )
+            db.session.add(nova_solicitacao)
 
-    conn.commit()
-    conn.close()
+    db.session.commit()
 
     session['usuario'] = nome
-    session['usuario_foto'] = foto_perfil
+    session['usuario_foto'] = servidor.foto_perfil
     return redirect('/dashboard')
 
 
@@ -566,34 +518,21 @@ def aprovar_cbo(solicitacao_id):
         return redirect('/dashboard')
 
     acao = request.form.get('acao')
-    conn = conectar_rh()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT *
-        FROM solicitacoes_cbo
-        WHERE id=? AND status='pendente'
-    """, (solicitacao_id,))
-    solicitacao = cursor.fetchone()
-
-    if solicitacao and acao == 'aprovar':
-        cursor.execute("""
-            UPDATE servidores
-            SET cbo=?, updated_at=CURRENT_TIMESTAMP
-            WHERE id=?
-        """, (solicitacao['cbo_solicitado'], solicitacao['servidor_id']))
-        status = 'aprovada'
-    else:
-        status = 'rejeitada'
+    solicitacao = SolicitacaoCBO.query.filter_by(id=solicitacao_id, status='pendente').first()
 
     if solicitacao:
-        cursor.execute("""
-            UPDATE solicitacoes_cbo
-            SET status=?, aprovado_por=?, analisado_em=CURRENT_TIMESTAMP
-            WHERE id=?
-        """, (status, session['usuario_id'], solicitacao_id))
+        if acao == 'aprovar':
+            servidor = Servidor.query.get(solicitacao.servidor_id)
+            if servidor:
+                servidor.cbo = solicitacao.cbo_solicitado
+            solicitacao.status = 'aprovada'
+        else:
+            solicitacao.status = 'rejeitada'
 
-    conn.commit()
-    conn.close()
+        solicitacao.aprovado_por = session['usuario_id']
+        solicitacao.analisado_em = func.current_timestamp()
+        db.session.commit()
+
     return redirect('/dashboard')
 
 
@@ -606,130 +545,44 @@ def logout():
 @app.route('/atualizar_paciente', methods=['POST'])
 def atualizar_paciente():
     dados = request.get_json()
+    prontuario = dados.get('prontuario')
 
-    try:
-        conn = conectar()
-        cursor = conn.cursor()
+    paciente = Paciente.query.filter_by(prontuario=prontuario).first()
+    if not paciente:
+        return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-        cursor.execute("""
-            UPDATE pacientes
-            SET
-                terapeuta_referencia=?,
-                nome_paciente=?,
-                nome_social=?,
-                cns_paciente=?,
-                rg=?,
-                cpf=?,
-                naturalidade=?,
-                sexo=?,
-                data_nascimento=?,
-                raca_cor=?,
-                etnia=?,
-                orientacao_religiosa=?,
-                escolaridade=?,
-                nome_mae=?,
-                nome_pai=?,
-                nome_responsavel=?,
-                grau_parentesco_responsavel=?,
-                telefone_responsavel=?,
-                municipio=?,
-                uf=?,
-                zona=?,
-                cep=?,
-                bairro=?,
-                tipo=?,
-                logradouro=?,
-                numero=?,
-                complemento=?,
-                ddd=?,
-                telefone=?,
-                data_admissao=?,
-                origem_paciente=?,
-                especificacao_origem=?,
-                cnes_usf=?,
-                cid=?,
-                statusPaciente=?,
-                data_conclusao=?
-            WHERE prontuario=?
-        """, (
-            dados.get('terapeuta_referencia'),
-            dados.get('nome_paciente'),
-            dados.get('nome_social'),
-            dados.get('cns_paciente'),
-            dados.get('rg'),
-            dados.get('cpf'),
-            dados.get('naturalidade'),
-            dados.get('sexo'),
-            dados.get('data_nascimento'),
-            dados.get('raca_cor'),
-            dados.get('etnia'),
-            dados.get('orientacao_religiosa'),
-            dados.get('escolaridade'),
-            dados.get('nome_mae'),
-            dados.get('nome_pai'),
-            dados.get('nome_responsavel'),
-            dados.get('grau_parentesco_responsavel'),
-            dados.get('telefone_responsavel'),
-            dados.get('municipio'),
-            dados.get('uf'),
-            dados.get('zona'),
-            dados.get('cep'),
-            dados.get('bairro'),
-            dados.get('tipo'),
-            dados.get('logradouro'),
-            dados.get('numero'),
-            dados.get('complemento'),
-            dados.get('ddd'),
-            dados.get('telefone'),
-            dados.get('data_admissao'),
-            dados.get('origem_paciente'),
-            dados.get('especificacao_origem'),
-            dados.get('cnes_usf'),
-            dados.get('cid'),
-            dados.get('statusPaciente'),
-            dados.get('data_conclusao'),
-            dados.get('prontuario')
-        ))
+    # Atualiza dinamicamente apenas as propriedades válidas enviadas no JSON
+    for campo, valor in dados.items():
+        if hasattr(paciente, campo):
+            setattr(paciente, campo, valor)
 
-        conn.commit()
-        conn.close()
-
-        return jsonify({'mensagem': 'Paciente atualizado com sucesso!'})
-
-    except Exception as e:
-        print("ERRO UPDATE:", e)
-        return jsonify({'erro': str(e)}), 500
+    db.session.commit()
+    return jsonify({'mensagem': 'Paciente atualizado com sucesso!'})
 
 
 @app.route('/buscar_paciente')
 def buscar_paciente():
-    prontuario = request.args.get('prontuario')
-    prontuario = prontuario.lstrip('0')
-
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT prontuario, nome_paciente
-        FROM pacientes
-        WHERE ltrim(prontuario, '0') = ?
-    """, (prontuario,))
-
-    paciente = cursor.fetchone()
-    conn.close()
+    prontuario = request.args.get('prontuario', '').strip()
+    
+    paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
 
     if paciente:
         return jsonify({
-            "prontuario": paciente[0],
-            "nome_paciente": paciente[1]
+            "prontuario": paciente.prontuario,
+            "nome_paciente": paciente.nome_paciente
         })
 
     return jsonify({"erro": "Paciente nao encontrado"}), 404
 
 
-init_database()
-init_rh_database()
+# ==========================================
+# INICIALIZAÇÃO DA BASE DE DADOS
+# ==========================================
 
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)

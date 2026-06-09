@@ -576,3 +576,60 @@ function salvarPaciente() {
         salvarEdicao();
     }
 }
+
+
+function toggleCamposFamiliar(selectElement) {
+    const linha = selectElement.closest('.linha-telefone');
+    const camposFamiliar = linha.querySelector('.campos-familiar');
+    const inputsFamiliar = camposFamiliar.querySelectorAll('input');
+
+    if (selectElement.value === 'Familiar') {
+        camposFamiliar.classList.remove('oculto');
+        inputsFamiliar.forEach(input => input.required = true);
+    } else {
+        camposFamiliar.classList.add('oculto');
+        inputsFamiliar.forEach(input => {
+            input.required = false;
+            input.value = '';
+        });
+    }
+}
+
+function adicionarTelefone() {
+    const container = document.getElementById('container-telefones');
+    const novaLinha = document.createElement('div');
+    novaLinha.className = 'linha-telefone';
+    novaLinha.style = 'display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;';
+    
+    novaLinha.innerHTML = `
+        <div style="grid-column: span 2;">
+            <label style="font-size: 11px; color: #666;">DDD</label>
+            <input type="text" name="ddd[]" placeholder="Ex: 11" maxlength="2" required>
+        </div>
+        <div style="grid-column: span 3;">
+            <label style="font-size: 11px; color: #666;">Número</label>
+            <input type="text" name="numero_telefone[]" placeholder="99999-9999" required>
+        </div>
+        <div style="grid-column: span 3;">
+            <label style="font-size: 11px; color: #666;">Pertence a</label>
+            <select name="tipo_telefone[]" onchange="toggleCamposFamiliar(this)">
+                <option value="Paciente">Paciente</option>
+                <option value="Familiar">Familiar</option>
+            </select>
+        </div>
+        <div class="campos-familiar oculto" style="grid-column: span 3;">
+            <label style="font-size: 11px; color: #666;">Familiar (Nome / Parentesco)</label>
+            <input type="text" name="nome_familiar[]" placeholder="Nome" style="margin-bottom: 4px;">
+            <input type="text" name="parentesco_familiar[]" placeholder="Parentesco">
+        </div>
+        <div style="grid-column: span 1; text-align: center;">
+            <button type="button" class="acao" style="background: #dc3545; color: white; border: none; margin-bottom: 4px;" onclick="removerTelefone(this)">&times;</button>
+        </div>
+    `;
+    
+    container.appendChild(novaLinha);
+}
+
+function removerTelefone(botao) {
+    botao.closest('.linha-telefone').remove();
+}

@@ -3,159 +3,202 @@
 {% block conteudo %}
 
 <div style="margin-top: 25px;">
-    <!-- HEADER -->
+    
     <div class="d-flex justify-content-between align-items-center mb-4 conteudoprincipal">
-      <h3>Pacientes</h3>
+        <h3>Pacientes</h3>
+        <button class="btn btn-primary" onclick="abrirNovoPaciente()">+ Novo paciente</button>
     </div>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="card mb-4 shadow-sm border-0">
-            <div class="card-body">
-                <div class="row g-2">
-
-                    <div class="col-md-4">
-                        <input type="text" class="form-control" placeholder="Buscar paciente...">
-                    </div>
-
-                    <div class="col-md-2">
-                        <select class="form-select">
-                        <option>Situação</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <select class="form-select">
-                        <option>Faixa etária</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <button class="btn btn-outline-primary w-100 botao">Filtrar</button>
+    
+    <div class="card mb-4 shadow-sm border-0">
+    <div class="card-body">
+        <form method="GET" action=""> 
+            <div class="row g-2 align-items-end"> 
+                
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Buscar por:</label>
+                    <select class="form-select" name="tipo_busca">
+                        <option value="nome_paciente" {% if request.args.get('tipo_busca') == 'nome_paciente' %}selected{% endif %}>Nome do Paciente</option>
+                        <option value="prontuario" {% if request.args.get('tipo_busca') == 'prontuario' %}selected{% endif %}>Prontuário</option>
+                        <option value="cpf" {% if request.args.get('tipo_busca') == 'cpf' %}selected{% endif %}>CPF</option>
+                        <option value="raca_cor" {% if request.args.get('tipo_busca') == 'raca_cor' %}selected{% endif %}>Raça/Cor</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">Termo de pesquisa</label>
+                    <input type="text" class="form-control" name="termo" value="{{ request.args.get('termo', '') }}" placeholder="Digite para buscar...">
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Situação</label>
+                    <select class="form-select" name="situacao">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Raça/Cor</label>
+                    <select class="form-select" name="raca_cor_filtro">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="d-flex gap-1">
+                        <button type="submit" class="btn btn-primary w-100" title="Filtrar">
+                            Filtrar
+                        </button>
+                        
+                        <a href="/pacientes" class="btn btn-outline-secondary w-100" title="Limpar Filtros">
+                            Limpar
+                        </a>
                     </div>
                 </div>
+
             </div>
-        </div>
-        <button class="btn btn-primary" onclick="abrirNovoPaciente()">+ Novo paciente</button>
-    </div>    
+        </form>
+    </div>
+</div>
+
     <div class="container-fluid">
         <div class="table-responsive">
-            <table class="table table-striped">
+            <table class="table table-striped" style="table-layout: fixed;">
                 <thead>
                     <tr>
-                    <th class="text-center" style="width: 40px">PRONT.</th>
-                    <th class="text-center" style="width: 120px">PACIENTE</th>
-                    <th class="text-center" style="width: 50px">DATA NASC.</th>
-                    <th class="text-center" style="width: 80px">IDADE</th>
-                    <th class="text-center" style="width: 100px">TÉCNICO DE REFERÊNCIA</th>
-                    <th class="text-center" style="width: 100px">STATUS</th>
-                    <th class="text-center" style="width: 80px">ÚLTIMO ATENDIMENTO</th>
-                    <th class="text-center" style="width: 40px">AÇÕES</th>
+                        <th class="text-center" style="width: 40px">PRONT.</th>
+                        <th class="text-center" style="width: 120px">PACIENTE</th>
+                        <th class="text-center" style="width: 50px">DATA NASC.</th>
+                        <th class="text-center" style="width: 80px">IDADE</th>
+                        <th class="text-center" style="width: 100px">TÉCNICO DE REFERÊNCIA</th>
+                        <th class="text-center" style="width: 100px">STATUS</th>
+                        <th class="text-center" style="width: 80px">ÚLTIMO ATENDIMENTO</th>
+                        <th class="text-center" style="width: 40px">AÇÕES</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     {% for p in pacientes %}
                     <tr>
-                    <td class="text-center">{{ p[0] }}</td>
-                    <td class="text-center">
-                      <strong>  {% if p[3] and p[3] != '' %}
-                                {{ p[3] }}
+                        <td class="text-center">{{ p.prontuario }}</td>
+                        <td class="text-center">
+                            <strong> 
+                                {% if p.nome_social and p.nome_social != '' %}
+                                    {{ p.nome_social }}
                                 {% else %}
-                                {{ p[2] }}
-                                {% endif %} </strong><br>
-                        <small class="text-muted">CPF: {{ p[6] }}</small>
-                    </td>
-                    <td class="text-center">
-                    {{ p[9]}}
-                    </td>
-                    <td class="idade text-center" data-nascimento="{{ p[9] }}"></td>
-                    <td class="text-center">{{ p[1] }}</td>
-                    <td class="text-center">{{ p[35] }}</td>
-                    <td class="text-center"></td>
-                    <td class="text-center">
-                        <button 
-                        onclick="abrirPaciente(this, 'view')"
-                        data-prontuario="{{ p[0] }}"
-                        data-nome-paciente="{{ p[2] }}"
-                        data-nome-social="{{ p[3] }}"
-                        data-cpf="{{ p[6] }}"
-                        data-rg="{{ p[5] }}"
-                        data-cns-paciente="{{ p[4] }}"
-                        data-naturalidade="{{ p[7] }}"
-                        data-sexo="{{ p[8] }}"
-                        data-data-nascimento="{{ p[9] }}"
-                        data-raca-cor="{{ p[10] }}"
-                        data-etnia="{{ p[11] }}"
-                        data-orientacao-religiosa="{{ p[12] }}"
-                        data-escolaridade="{{ p[13] }}"
-                        data-nome-mae="{{ p[14] }}"
-                        data-nome-pai="{{ p[15] }}"
-                        data-nome-responsavel="{{ p[16] }}"
-                        data-grau-parentesco-responsavel="{{ p[17] }}"
-                        data-telefone-responsavel="{{ p[18] }}"
-                        data-telefone="{{ p[28] }}"
-                        data-municipio="{{ p[19] }}"
-                        data-uf="{{ p[20] }}"
-                        data-zona="{{ p[21] }}"
-                        data-cep="{{ p[22] }}"
-                        data-bairro="{{ p[23] }}"
-                        data-tp-logradouro="{{ p[24] }}"
-                        data-logradouro="{{ p[25] }}"
-                        data-numero="{{ p[26] }}"
-                        data-complemento="{{ p[27] }}"
-                        data-data-admissao="{{ p[30] }}"
-                        data-origem="{{ p[31] }}"
-                        data-especificar-origem="{{ p[32] }}"
-                        data-cnes="{{ p[33] }}"
-                        data-cid="{{ p[34] }}"
-                        data-status-paciente="{{ p[35] }}"
-                        data-data-conclusao="{{ p[36] }}"
-                        data-terapeuta="{{ p[1] }}"
-                        >
-                            👁
-                        </button>
-                        <button onclick="abrirPaciente(this, 'edit')"
-                        data-prontuario="{{ p[0] }}"
-                        data-nome-paciente="{{ p[2] }}"
-                        data-nome-social="{{ p[3] }}"
-                        data-cpf="{{ p[6] }}"
-                        data-rg="{{ p[5] }}"
-                        data-cns-paciente="{{ p[4] }}"
-                        data-naturalidade="{{ p[7] }}"
-                        data-sexo="{{ p[8] }}"
-                        data-data-nascimento="{{ p[9] }}"
-                        data-raca-cor="{{ p[10] }}"
-                        data-etnia="{{ p[11] }}"
-                        data-orientacao-religiosa="{{ p[12] }}"
-                        data-escolaridade="{{ p[13] }}"
-                        data-nome-mae="{{ p[14] }}"
-                        data-nome-pai="{{ p[15] }}"
-                        data-nome-responsavel="{{ p[16] }}"
-                        data-grau-parentesco-responsavel="{{ p[17] }}"
-                        data-telefone-responsavel="{{ p[18] }}"
-                        data-telefone="{{ p[28] }}"
-                        data-municipio="{{ p[19] }}"
-                        data-uf="{{ p[20] }}"
-                        data-zona="{{ p[21] }}"
-                        data-cep="{{ p[22] }}"
-                        data-bairro="{{ p[23] }}"
-                        data-tp-logradouro="{{ p[24] }}"
-                        data-logradouro="{{ p[25] }}"
-                        data-numero="{{ p[26] }}"
-                        data-complemento="{{ p[27] }}"
-                        data-data-admissao="{{ p[30] }}"
-                        data-origem="{{ p[31] }}"
-                        data-especificar-origem="{{ p[32] }}"
-                        data-cnes="{{ p[33] }}"
-                        data-cid="{{ p[34] }}"
-                        data-status-paciente="{{ p[35] }}"
-                        data-data-conclusao="{{ p[36] }}"
-                        data-terapeuta="{{ p[1] }}">✏️</button>
-                    </td>
+                                    {{ p.nome_paciente }}
+                                {% endif %} 
+                            </strong><br>
+                            <small class="text-muted">CPF: {{ p.cpf }}</small>
+                        </td>
+                        <td class="text-center">{{ p.data_nascimento }}</td>
+                        <td class="idade text-center" data-nascimento="{{ p.data_nascimento }}"></td>
+                        <td class="text-center">{{ p.terapeuta_referencia }}</td>
+                        <td class="text-center">{{ p.statusPaciente }}</td>
+                        <td class="text-center"></td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    style="padding: 1px 6px; font-size: 13px;"
+                                    type="button"
+                                    onclick="abrirPaciente(this, 'view')"
+                                    data-prontuario="{{ p.prontuario }}"
+                                    data-nome-paciente="{{ p.nome_paciente }}"
+                                    data-nome-social="{{ p.nome_social }}"
+                                    data-cpf="{{ p.cpf }}"
+                                    data-rg="{{ p.rg }}"
+                                    data-cns-paciente="{{ p.cns_paciente }}"
+                                    data-naturalidade="{{ p.naturalidade }}"
+                                    data-sexo="{{ p.sexo }}"
+                                    data-data-nascimento="{{ p.data_nascimento }}"
+                                    data-raca-cor="{{ p.raca_cor }}"
+                                    data-etnia="{{ p.etnia }}"
+                                    data-orientacao-religiosa="{{ p.orientacao_religiosa }}"
+                                    data-escolaridade="{{ p.escolaridade }}"
+                                    data-nome-mae="{{ p.nome_mae }}"
+                                    data-nome-pai="{{ p.nome_pai }}"
+                                    data-nome-responsavel="{{ p.nome_responsavel }}"
+                                    data-grau-parentesco-responsavel="{{ p.grau_parentesco_responsavel }}"
+                                    data-telefone-responsavel="{{ p.telefone_responsavel }}"
+                                    data-telefone="{{ p.telefone }}"
+                                    data-municipio="{{ p.municipio }}"
+                                    data-uf="{{ p.uf }}"
+                                    data-zona="{{ p.zona }}"
+                                    data-cep="{{ p.cep }}"
+                                    data-bairro="{{ p.bairro }}"
+                                    data-tp-logradouro="{{ p.tipo }}"
+                                    data-logradouro="{{ p.logradouro }}"
+                                    data-numero="{{ p.numero }}"
+                                    data-complemento="{{ p.complemento }}"
+                                    data-data-admissao="{{ p.data_admissao }}"
+                                    data-origem="{{ p.origem_paciente }}"
+                                    data-especificar-origem="{{ p.especificacao_origem }}"
+                                    data-cnes="{{ p.cnes_usf }}"
+                                    data-cid="{{ p.cid }}"
+                                    data-status-paciente="{{ p.statusPaciente }}"
+                                    data-data-conclusao="{{ p.data_conclusao }}"
+                                    data-terapeuta="{{ p.terapeuta_referencia }}"
+                            >
+                                👁
+                            </button>
+
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    style="padding: 1px 6px; font-size: 13px;"
+                                    type="button"
+                                    onclick="abrirPaciente(this, 'edit')"
+                                    data-prontuario="{{ p.prontuario }}"
+                                    data-nome-paciente="{{ p.nome_paciente }}"
+                                    data-nome-social="{{ p.nome_social }}"
+                                    data-cpf="{{ p.cpf }}"
+                                    data-rg="{{ p.rg }}"
+                                    data-cns-paciente="{{ p.cns_paciente }}"
+                                    data-naturalidade="{{ p.naturalidade }}"
+                                    data-sexo="{{ p.sexo }}"
+                                    data-data-nascimento="{{ p.data_nascimento }}"
+                                    data-raca-cor="{{ p.raca_cor }}"
+                                    data-etnia="{{ p.etnia }}"
+                                    data-orientacao-religiosa="{{ p.orientacao_religiosa }}"
+                                    data-escolaridade="{{ p.escolaridade }}"
+                                    data-nome-mae="{{ p.nome_mae }}"
+                                    data-nome-pai="{{ p.nome_pai }}"
+                                    data-nome-responsavel="{{ p.nome_responsavel }}"
+                                    data-grau-parentesco-responsavel="{{ p.grau_parentesco_responsavel }}"
+                                    data-telefone-responsavel="{{ p.telefone_responsavel }}"
+                                    data-telefone="{{ p.telefone }}"
+                                    data-municipio="{{ p.municipio }}"
+                                    data-uf="{{ p.uf }}"
+                                    data-zona="{{ p.zona }}"
+                                    data-cep="{{ p.cep }}"
+                                    data-bairro="{{ p.bairro }}"
+                                    data-tp-logradouro="{{ p.tipo }}"
+                                    data-logradouro="{{ p.logradouro }}"
+                                    data-numero="{{ p.numero }}"
+                                    data-complemento="{{ p.complemento }}"
+                                    data-data-admissao="{{ p.data_admissao }}"
+                                    data-origem="{{ p.origem_paciente }}"
+                                    data-especificar-origem="{{ p.especificacao_origem }}"
+                                    data-cnes="{{ p.cnes_usf }}"
+                                    data-cid="{{ p.cid }}"
+                                    data-status-paciente="{{ p.statusPaciente }}"
+                                    data-data-conclusao="{{ p.data_conclusao }}"
+                                    data-terapeuta="{{ p.terapeuta_referencia }}"
+                            >
+                                ✏️
+                            </button>
+                            
+                            <a href="/paciente/{{ p.prontuario }}/ficha_word" target="_blank" class="btn btn-sm btn-outline-secondary" title="Gerar Ficha de Acolhimento" style="padding: 1px 6px; font-size: 13px;">
+                                📄
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            Nenhum paciente encontrado com os termos digitados.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
- </div>   
+</div>   
 {% endblock %}

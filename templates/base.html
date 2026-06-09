@@ -20,7 +20,7 @@
           <div class="sidebar-panel">
             
 
-            <ul class="navbar-nav sidebar-nav">
+            <ul class="navbar-nav sidebar-nav" style="padding: 15px;">
               <li class="nav-item">
                 <a class="nav-link {% if rota_atual == '/dashboard' %}active{% endif %}" href="/dashboard">
                   <img src="../static/house_3661264.png" alt="" class="nav-icon">
@@ -54,10 +54,7 @@
 
           <img src="{% if usuario_foto %}{{ url_for('static', filename=usuario_foto) }}{% else %}https://via.placeholder.com/32{% endif %}"
             class="rounded-circle me-2 avatar-menu">
-
-          <strong>{{ usuario }}</strong>
-        </a>
-
+            <strong>{{ usuario }}</strong> 
         <ul class="dropdown-menu dropdown-menu-end">
 
           <li><a class="dropdown-item" href="#" onclick="abrirModalPerfil()">Perfil</a></li>
@@ -185,12 +182,48 @@
       <label>Parentesco:</label>
       <input id="grau_parentesco_responsavel" readonly>
 
-      <label>Telefone do responsavel:</label>
-      <input id="telefone_responsavel" type="tel" maxlength="15" placeholder="(00) 00000-0000" readonly>
+        <div class="campo-largo" style="margin-top: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <label style="margin: 0;">Telefones de Contato</label>
+            <button type="button" class="acao" onclick="adicionarTelefone()" style="width: auto;">+ Adicionar</button>
+          </div>
+    
+          <style>.oculto { display: none !important; }</style>
 
-      <label>Telefone do Paciente:</label>
-      <input id="telefone" type="tel" maxlength="15" placeholder="(00) 00000-0000" readonly>
-    </div>
+          <div id="container-telefones">
+            <div class="linha-telefone" style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;">
+            
+                <div style="grid-column: span 2;">
+                  <label style="font-size: 11px; color: #666;">DDD</label>
+                  <input type="text" name="ddd[]" placeholder="Ex: 11" maxlength="2" required>
+                </div>
+            
+                <div style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Número</label>
+                    <input type="text" name="numero_telefone[]" placeholder="99999-9999" required>
+                </div>
+            
+                <div style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Pertence a</label>
+                    <select name="tipo_telefone[]" onchange="toggleCamposFamiliar(this)">
+                        <option value="Paciente">Paciente</option>
+                        <option value="Familiar">Familiar</option>
+                    </select>
+                </div>
+            
+                <div class="campos-familiar oculto" style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Familiar (Nome / Parentesco)</label>
+                    <input type="text" name="nome_familiar[]" placeholder="Nome" style="margin-bottom: 4px;">
+                    <input type="text" name="parentesco_familiar[]" placeholder="Parentesco">
+                </div>
+            
+                <div style="grid-column: span 1; text-align: center;">
+                    <button type="button" class="acao" style="background: #dc3545; color: white; border: none; margin-bottom: 4px;" disabled>&times;</button>
+                </div>
+            </div>
+          </div> 
+        </div>
+    </div> 
 
     <div id="pessoal" class="aba form-grid" style="display:none;">
       <label>Data de Nascimento:</label>
