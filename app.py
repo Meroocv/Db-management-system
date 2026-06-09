@@ -71,10 +71,22 @@ class Paciente(db.Model):
     origem_paciente = db.Column(db.String(100))
     especificacao_origem = db.Column(db.String(100))
     cnes_usf = db.Column(db.String(20))
+    
+    telefones = db.relationship('TelefonePaciente', backref='paciente', cascade="all, delete-orphan", lazy=True)
 
     def __repr__(self):
         return f"<Paciente {self.nome_paciente} (Prontuario: {self.prontuario})>"
 
+class TelefonePaciente(db.Model):
+    __tablename__ = 'telefones_paciente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    prontuario_paciente = db.Column(db.String(50), db.ForeignKey('pacientes.prontuario', ondelete='CASCADE'), nullable=False)
+    ddd = db.Column(db.String(2), nullable=False)
+    numero = db.Column(db.String(15), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False) # 'Paciente' ou 'Familiar'
+    nome_familiar = db.Column(db.String(100), nullable=True)
+    parentesco_familiar = db.Column(db.String(50), nullable=True)
 
 class Servidor(db.Model):
     __tablename__ = 'servidores'
@@ -254,50 +266,58 @@ def novo_paciente():
     if not dados:
         return jsonify({"erro": "Os dados não foram enviados no formato JSON correto."}), 400
 
-    # Agora validamos APENAS o nome, já que o prontuário é automático
     if not dados.get('nome_paciente'):
         return jsonify({"erro": "O Nome do Paciente é um campo obrigatório."}), 400
 
     try:
         novo = Paciente()
         
-        # Preenche os campos vindos do front-end (exceto o prontuário por enquanto)
+        # Preenche os campos vindos do front-end (exceto chaves/relacionamentos)
         for campo, valor in dados.items():
-            if hasattr(novo, campo) and campo != 'prontuario':
+            if hasattr(novo, campo) and campo not in ['prontuario', 'telefones']:
                 setattr(novo, campo, valor)
 
-        # LÓGICA DO PRONTUÁRIO AUTOMÁTICO:
-        # Se o front-end não enviou um prontuário, nós geramos o próximo número
+        # Lógica de geração do prontuário
         if not dados.get('prontuario'):
-            # Busca o maior prontuário numérico existente no banco
             ultimo_paciente = db.session.query(Paciente.prontuario)\
                 .order_by(func.cast(Paciente.prontuario, db.Integer).desc())\
                 .first()
             
             if ultimo_paciente and ultimo_paciente[0] and ultimo_paciente[0].isdigit():
                 proximo_numero = int(ultimo_paciente[0]) + 1
-                # .zfill(6) mantém o padrão de跟 zeros à esquerda (ex: 000042)
                 novo.prontuario = str(proximo_numero).zfill(6)
             else:
-                novo.prontuario = "000001" # Caso seja o primeiríssimo paciente do banco
+                novo.prontuario = "000001"
         else:
             novo.prontuario = str(dados.get('prontuario')).strip()
 
         db.session.add(novo)
+
+        # 🌟 SALVA MULTIPLOS TELEFONES
+        telefones_recebidos = dados.get('telefones', [])
+        for tel in telefones_recebidos:
+            novo_tel = TelefonePaciente(
+                prontuario_paciente=novo.prontuario,
+                ddd=tel.get('ddd'),
+                numero=tel.get('numero'),
+                tipo=tel.get('tipo'),
+                nome_familiar=tel.get('nome_familiar') if tel.get('tipo') == 'Familiar' else None,
+                parentesco_familiar=tel.get('parentesco_familiar') if tel.get('tipo') == 'Familiar' else None
+            )
+            db.session.add(novo_tel)
+
         db.session.commit()
         
-        # Retornamos o número gerado para você saber qual foi
         return jsonify({
-            "mensagem": "Paciente cadastrado com sucesso!",
+            "mensagem": "Paciente e telefones cadastrados com sucesso!",
             "prontuario": novo.prontuario
         })
 
     except Exception as e:
         db.session.rollback()
-        print("\n=== ERRO NO BANCO DE DADOS EM NOVO_PACIENTE ===")
-        print(str(e))
-        print("================================================\n")
+        print(f"\n=== ERRO EM NOVO_PACIENTE: {str(e)} ===\n")
         return jsonify({"erro": f"Erro interno ao salvar no banco: {str(e)}"}), 500
+    
 
 @app.route('/cadastro')
 def cadastro():
@@ -551,15 +571,35 @@ def atualizar_paciente():
     if not paciente:
         return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-    # Atualiza dinamicamente apenas as propriedades válidas enviadas no JSON
-    for campo, valor in dados.items():
-        if hasattr(paciente, campo):
-            setattr(paciente, campo, valor)
+    try:
+        # Atualiza dados nativos do paciente
+        for campo, valor in dados.items():
+            if hasattr(paciente, campo) and campo not in ['prontuario', 'telefones']:
+                setattr(paciente, campo, valor)
 
-    db.session.commit()
-    return jsonify({'mensagem': 'Paciente atualizado com sucesso!'})
+        # 🌟 ATUALIZAÇÃO DOS TELEFONES (Delete antigo e insere novo fluxo)
+        TelefonePaciente.query.filter_by(prontuario_paciente=prontuario).delete()
 
+        telefones_recebidos = dados.get('telefones', [])
+        for tel in telefones_recebidos:
+            novo_tel = TelefonePaciente(
+                prontuario_paciente=prontuario,
+                ddd=tel.get('ddd'),
+                numero=tel.get('numero'),
+                tipo=tel.get('tipo'),
+                nome_familiar=tel.get('nome_familiar') if tel.get('tipo') == 'Familiar' else None,
+                parentesco_familiar=tel.get('parentesco_familiar') if tel.get('tipo') == 'Familiar' else None
+            )
+            db.session.add(novo_tel)
 
+        db.session.commit()
+        return jsonify({'mensagem': 'Paciente e lista de telefones atualizados com sucesso!'})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"\n=== ERRO EM ATUALIZAR_PACIENTE: {str(e)} ===\n")
+        return jsonify({"erro": f"Erro ao atualizar: {str(e)}"}), 500
+    
 @app.route('/buscar_paciente')
 def buscar_paciente():
     prontuario = request.args.get('prontuario', '').strip()

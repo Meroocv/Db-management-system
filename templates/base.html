@@ -52,7 +52,7 @@
           href="#"
           data-bs-toggle="dropdown">
 
-          <img src="{% if usuario_foto %}{{ url_for('static', filename=usuario_foto) }}{% else %}https://via.placeholder.com/32{% endif %}"
+          <img src="{% if usuario_foto %}{{ url_for('static', filename=usuario_foto) }}{% else %}{{ url_for('static', filename=utilizador) }}{% endif %}"
             class="rounded-circle me-2 avatar-menu">
             <strong>{{ usuario }}</strong> 
         <ul class="dropdown-menu dropdown-menu-end">
@@ -182,13 +182,15 @@
       <label>Parentesco:</label>
       <input id="grau_parentesco_responsavel" readonly>
 
-        <div class="campo-largo" style="margin-top: 15px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <label style="margin: 0;">Telefones de Contato</label>
-            <button type="button" class="acao" onclick="adicionarTelefone()" style="width: auto;">+ Adicionar</button>
-          </div>
-    
-          <style>.oculto { display: none !important; }</style>
+      <div class="campo-largo" style="grid-column: span 12; margin-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="font-weight: bold; margin: 0;">Telefones de Contato</label>
+          <button type="button" id="btn-adicionar-telefone" class="acao" onclick="adicionarTelefone()" style="width: auto;">+ Adicionar</button>
+        </div>
+        
+        <style>
+          .oculto { display: none !important; }
+          .linha-telefone input, .linha-telefone select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }</style>
 
           <div id="container-telefones">
             <div class="linha-telefone" style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;">
@@ -216,10 +218,13 @@
                     <input type="text" name="nome_familiar[]" placeholder="Nome" style="margin-bottom: 4px;">
                     <input type="text" name="parentesco_familiar[]" placeholder="Parentesco">
                 </div>
-            
+                {% if readonly == False %}
                 <div style="grid-column: span 1; text-align: center;">
+                  {% if loop.index > 1 %}
                     <button type="button" class="acao" style="background: #dc3545; color: white; border: none; margin-bottom: 4px;" disabled>&times;</button>
+                  {% endif %}
                 </div>
+                {% endif %}
             </div>
           </div> 
         </div>

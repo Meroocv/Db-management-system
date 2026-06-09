@@ -16,6 +16,7 @@ function calcularIdade(data) {
 
   return idade;
 }
+
 document.querySelectorAll(".idade").forEach(td => {
   const data = td.dataset.nascimento;
   const idade = calcularIdade(data);
@@ -79,38 +80,39 @@ document.addEventListener('DOMContentLoaded', organizarCamposDosModais);
 function abrirPaciente(btn, modo) {
 
     let dados = {
-    prontuario: btn.dataset.prontuario,
-    nome_paciente: btn.dataset.nomePaciente,
-    nome_social: btn.dataset.nomeSocial,
-    cpf: btn.dataset.cpf,
-    rg: btn.dataset.rg,
-    cns_paciente: btn.dataset.cnsPaciente,
-    data_nascimento: btn.dataset.dataNascimento,
-    sexo: btn.dataset.sexo,
-    naturalidade: btn.dataset.naturalidade,
-    raca_cor: btn.dataset.racaCor,
-    escolaridade: btn.dataset.escolaridade,
-    etnia: btn.dataset.etnia,
-    orientacao_religiosa: btn.dataset.orientacaoReligiosa,
-    nome_mae: btn.dataset.nomeMae,
-    nome_pai: btn.dataset.nomePai,
-    nome_responsavel: btn.dataset.nomeResponsavel,
-    grau_parentesco_responsavel: btn.dataset.grauParentescoResponsavel,
-    telefone_responsavel: btn.dataset.telefoneResponsavel,
-    telefone: btn.dataset.telefone,
-    municipio: btn.dataset.municipio,
-    uf: btn.dataset.uf,
-    zona: btn.dataset.zona,
-    cep: btn.dataset.cep,
-    bairro: btn.dataset.bairro,
-    logradouro: btn.dataset.logradouro,
-    numero: btn.dataset.numero,
-    complemento: btn.dataset.complemento,
-    statusPaciente: btn.dataset.statusPaciente,
-    terapeuta_referencia: btn.dataset.terapeutaReferencia,
-    cid: btn.dataset.cid,
-    data_admissao: btn.dataset.dataAdmissao,
-    data_conclusao: btn.dataset.dataConclusao
+        prontuario: btn.dataset.prontuario,
+        nome_paciente: btn.dataset.nomePaciente,
+        nome_social: btn.dataset.nomeSocial,
+        cpf: btn.dataset.cpf,
+        rg: btn.dataset.rg,
+        cns_paciente: btn.dataset.cnsPaciente,
+        data_nascimento: btn.dataset.dataNascimento,
+        sexo: btn.dataset.sexo,
+        naturalidade: btn.dataset.naturalidade,
+        raca_cor: btn.dataset.racaCor,
+        escolaridade: btn.dataset.escolaridade,
+        etnia: btn.dataset.etnia,
+        orientacao_religiosa: btn.dataset.orientacaoReligiosa,
+        nome_mae: btn.dataset.nomeMae,
+        nome_pai: btn.dataset.nomePai,
+        nome_responsavel: btn.dataset.nomeResponsavel,
+        grau_parentesco_responsavel: btn.dataset.grauParentescoResponsavel,
+        telefone_responsavel: btn.dataset.telefoneResponsavel,
+        telefone: btn.dataset.telefone,
+        municipio: btn.dataset.municipio,
+        uf: btn.dataset.uf,
+        zona: btn.dataset.zona,
+        cep: btn.dataset.cep,
+        bairro: btn.dataset.bairro,
+        tp_logradouro: btn.dataset.tpLogradouro, 
+        logradouro: btn.dataset.logradouro,
+        numero: btn.dataset.numero,
+        complemento: btn.dataset.complemento,
+        statusPaciente: btn.dataset.statusPaciente,
+        terapeuta_referencia: btn.dataset.terapeutaReferencia,
+        cid: btn.dataset.cid,
+        data_admissao: btn.dataset.dataAdmissao,
+        data_conclusao: btn.dataset.dataConclusao
     };
 
     function setValue(id, value) {
@@ -143,7 +145,7 @@ function abrirPaciente(btn, modo) {
     setValue('zona', dados.zona);
     setValue('cep', dados.cep);
     setValue('bairro', dados.bairro);
-    setValue('tp_logradouro', dados.tp_logradouro);
+    setValue('tp_logradouro', dados.tp_logradouro); 
     setValue('logradouro', dados.logradouro);
     setValue('numero', dados.numero);
     setValue('complemento', dados.complemento);
@@ -153,18 +155,50 @@ function abrirPaciente(btn, modo) {
     setValue('data_admissao', dados.data_admissao);
     setValue('data_conclusao', dados.data_conclusao);
 
+    // Atualiza a flag de modo no input hidden antes de mexer na renderização visual
+    let elModo = document.getElementById("modo");
+    if (elModo) elModo.value = modo;
 
     // abrir modal
     document.getElementById('modalPaciente').style.display = 'block';
     abrirAba('identificacao', document.querySelector('#modalPaciente .nav-link'));
 
-    // aplicar modo
-    setModoPaciente(modo !== 'view');
-    document.getElementById("modo").value = (modo === 'view') ? 'view' : 'edit';
+    // aplicar modo limpo e direto (Habilita ou desabilita campos do modal)
+    let ehEditavel = (modo !== 'view');
+    setModoPaciente(ehEditavel);
+
+    // 🌟 RENDERIZAR OS TELEFONES DO BANCO DE FORMA SEGURA:
+    const container = document.getElementById('container-telefones');
+    if (container) {
+        container.innerHTML = ''; // Limpa os telefones do paciente anterior aberto
+
+        let dadosTelefonesRaw = btn.getAttribute('data-telefones'); 
+        
+        if (dadosTelefonesRaw) {
+            try {
+                // Remove quebras de linha que o Jinja insere no HTML e que travam o JSON.parse
+                dadosTelefonesRaw = dadosTelefonesRaw.replace(/\r?\n|\r/g, " ").trim();
+                
+                const listaTelefones = JSON.parse(dadosTelefonesRaw);
+                
+                if (Array.isArray(listaTelefones) && listaTelefones.length > 0) {
+                    listaTelefones.forEach(tel => {
+                        adicionarTelefone(tel); 
+                    });
+                } else if (modo === 'edit' || modo === 'novo' || modo === 'new') {
+                    adicionarTelefone(); 
+                }
+            } catch (e) {
+                console.error("Erro ao analisar a string JSON de telefones:", e);
+                if (modo === 'edit' || modo === 'novo' || modo === 'new') adicionarTelefone();
+            }
+        } else if (modo === 'edit' || modo === 'novo' || modo === 'new') {
+            adicionarTelefone();
+        }
+    }
 }
 
 function abrirNovoPaciente() {
-
   // limpa TUDO
   document.querySelectorAll("#modalPaciente input, #modalPaciente select, #modalPaciente textarea")
     .forEach(el => el.value = "");
@@ -172,21 +206,26 @@ function abrirNovoPaciente() {
   // define prontuário como automático (visual)
   document.getElementById('prontuario').value = 'Automático';
 
+  // define modo primeiro para que adicionarTelefone() saiba que é editável
+  const elModo = document.getElementById("modo");
+  if (elModo) elModo.value = "novo";
+
+  // limpa e prepara container de telefones
+  const container = document.getElementById('container-telefones');
+  if (container) {
+      container.innerHTML = '';
+      adicionarTelefone(); // Adiciona uma linha limpa padrão
+  }
+
   // abre modal
   document.getElementById('modalPaciente').style.display = 'block';
   abrirAba('identificacao', document.querySelector('#modalPaciente .nav-link'));
 
   // ativa modo edição
   setModoPaciente(true);
-
-  // define modo (IMPORTANTE pra salvar depois)
-  document.getElementById("modo").value = "novo";
 }
 
-
-
 function setModoPaciente(editavel) {
-
     const inputs = document.querySelectorAll('#modalPaciente input, #modalPaciente select, #modalPaciente textarea');
 
     inputs.forEach(el => {
@@ -195,19 +234,29 @@ function setModoPaciente(editavel) {
         } else {
             el.readOnly = !editavel;
         }
-
-        // ❌ REMOVE ISSO
-        // el.disabled = !editavel;
     });
 
-    // 🔒 manter apenas readonly
+    // Manter prontuário travado
     const prontuario = document.getElementById('prontuario');
     if (prontuario) {
         prontuario.readOnly = true;
-        // prontuario.disabled = true ❌ REMOVE
     }
 
+    // Controlar botão Salvar
     document.getElementById('btnSalvar').style.display = editavel ? 'inline-block' : 'none';
+
+    // Força o botão de adicionar e os botões de remover a aparecerem/sumirem de acordo com o modo
+    let btnAdicionar = document.getElementById('btn-adicionar-telefone');
+    if (btnAdicionar) {
+        btnAdicionar.style.setProperty('display', editavel ? 'block' : 'none', 'important');
+        btnAdicionar.disabled = !editavel;
+    }
+
+    // Controla também os botões vermelhos "x" das linhas de telefone existentes
+    document.querySelectorAll('#container-telefones .btn-remover-telefone').forEach(btnRemover => {
+        btnRemover.style.setProperty('display', editavel ? 'inline-block' : 'none', 'important');
+        btnRemover.disabled = !editavel;
+    });
 }
 
 function abrirAba(aba, link) {
@@ -229,7 +278,6 @@ function abrirAba(aba, link) {
     }
 }
 
-
 function toggleSidebar() {
   document.getElementById("sidebarMenu").classList.toggle("closed");
 
@@ -249,8 +297,21 @@ function fecharModalPerfil() {
   if (modal) modal.style.display = 'none';
 }
 
-
 function salvarEdicao() {
+    // 🌟 CAPTURAR A LISTA DE TELEFONES DO CONTAINER (Igual você fez no inserirPaciente)
+    let listaTelefones = [];
+    document.querySelectorAll('#container-telefones .linha-telefone').forEach(linha => {
+        const ddd = linha.querySelector('input[name="ddd[]"]')?.value || '';
+        const numero = linha.querySelector('input[name="numero_telefone[]"]')?.value || '';
+        const tipo = linha.querySelector('select[name="tipo_telefone[]"]')?.value || 'Paciente';
+        const nome_familiar = linha.querySelector('input[name="nome_familiar[]"]')?.value || '';
+        const parentesco_familiar = linha.querySelector('input[name="parentesco_familiar[]"]')?.value || '';
+
+        if (ddd && numero) {
+            listaTelefones.push({ ddd, numero, tipo, nome_familiar, parentesco_familiar });
+        }
+    });
+
     let dados = {
         prontuario: document.getElementById('prontuario').value,
 
@@ -278,8 +339,8 @@ function salvarEdicao() {
         etnia: document.getElementById('etnia')?.value || '',
         orientacao_religiosa: document.getElementById('orientacao_religiosa')?.value || '',
 
-        // Contato
-        telefone: document.getElementById('telefone')?.value || '',
+        // 🌟 SUBSTUIÇÃO AQUI: Enviando a lista estruturada ao invés do campo único que não existe
+        telefones: listaTelefones,
 
         // Endereço
         municipio: document.getElementById('municipio')?.value || '',
@@ -316,30 +377,26 @@ function salvarEdicao() {
         alert('Erro ao salvar paciente');
     });
 }
+
 function fecharModal() {
     document.getElementById('modalPaciente').style.display = 'none';
 
-    // esconde todas as abas
     document.querySelectorAll('.aba').forEach(div => {
         div.style.display = 'none';
     });
 
-    // mostra identificação
     document.getElementById('identificacao').style.display = 'grid';
 
-    // reseta aba ativa
     document.querySelectorAll('#modalPaciente .nav-link').forEach(link => {
         link.classList.remove('active');
         link.removeAttribute('aria-current');
     });
 
-    // ativa primeira aba
     const primeira = document.querySelector('#modalPaciente .nav-link');
     if (primeira) {
         primeira.classList.add('active');
         primeira.setAttribute('aria-current', 'page');
     }
-    document.getElementById('modalPaciente').style.display = 'none';
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -349,7 +406,6 @@ document.addEventListener("DOMContentLoaded", function() {
         campo.addEventListener("blur", function() {
             let prontuario = this.value.trim();
 
-            // 🚫 BLOQUEIO PRINCIPAL
             if (!prontuario || prontuario === "0") {
                 console.log("Prontuário inválido, não buscar");
                 return;
@@ -379,7 +435,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
-
     
 function marcarProcedimentosAtendimento(procedimentos) {
     const selecionados = (procedimentos || '')
@@ -494,9 +549,21 @@ function salvarAtendimento() {
     });
 }
 
-
 function inserirPaciente() {
     const valor = (id) => document.getElementById(id)?.value || '';
+
+    let listaTelefones = [];
+    document.querySelectorAll('#container-telefones .linha-telefone').forEach(linha => {
+        const ddd = linha.querySelector('input[name="ddd[]"]')?.value || '';
+        const numero = linha.querySelector('input[name="numero_telefone[]"]')?.value || '';
+        const tipo = linha.querySelector('select[name="tipo_telefone[]"]')?.value || 'Paciente';
+        const nome_familiar = linha.querySelector('input[name="nome_familiar[]"]')?.value || '';
+        const parentesco_familiar = linha.querySelector('input[name="parentesco_familiar[]"]')?.value || '';
+
+        if (ddd && numero) {
+            listaTelefones.push({ ddd, numero, tipo, nome_familiar, parentesco_familiar });
+        }
+    });
 
     let dados = {
         nome_paciente: valor('nome_paciente'),
@@ -511,14 +578,11 @@ function inserirPaciente() {
         escolaridade: valor('escolaridade'),
         etnia: valor('etnia'),
         orientacao_religiosa: valor('orientacao_religiosa'),
-
         nome_mae: valor('nome_mae'),
         nome_pai: valor('nome_pai'),
         nome_responsavel: valor('nome_responsavel'),
         grau_parentesco_responsavel: valor('grau_parentesco_responsavel'),
         telefone_responsavel: valor('telefone_responsavel'),
-
-        telefone: valor('telefone'),
         municipio: valor('municipio'),
         uf: valor('uf'),
         zona: valor('zona'),
@@ -527,12 +591,12 @@ function inserirPaciente() {
         logradouro: valor('logradouro'),
         numero: valor('numero'),
         complemento: valor('complemento'),
-
         statusPaciente: valor('statusPaciente'),
         terapeuta_referencia: valor('terapeuta_referencia'),
         cid: valor('cid'),
         data_admissao: valor('data_admissao'),
-        data_conclusao: valor('data_conclusao')
+        data_conclusao: valor('data_conclusao'),
+        telefones: listaTelefones 
     };
 
     if (!dados.nome_paciente.trim()) {
@@ -540,7 +604,6 @@ function inserirPaciente() {
         document.getElementById('nome_paciente')?.focus();
         return;
     }
-
     if (!dados.data_nascimento) {
         alert("Informe a data de nascimento.");
         document.getElementById('data_nascimento')?.focus();
@@ -569,7 +632,6 @@ function inserirPaciente() {
 
 function salvarPaciente() {
     const modo = document.getElementById("modo").value;
-
     if (modo === "novo") {
         inserirPaciente();
     } else {
@@ -577,59 +639,79 @@ function salvarPaciente() {
     }
 }
 
+// 1. Função principal corrigida para gerenciar corretamente as permissões de edição
+function adicionarTelefone(dadosTel = null) {
+    const container = document.getElementById('container-telefones');
+    if (!container) return;
+
+    const modoAtual = document.getElementById('modo').value;
+    // O campo é editável se for 'edit' ou se for um cadastro 'novo'
+    const modoEdicao = (modoAtual === 'edit' || modoAtual === 'novo');
+
+    const linha = document.createElement('div');
+    linha.className = 'linha-telefone';
+    linha.style = "display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;";
+
+    const ddd = dadosTel ? dadosTel.ddd : '';
+    const numero = dadosTel ? dadosTel.numero : '';
+    const tipo = dadosTel ? dadosTel.tipo : 'Paciente';
+    const nome_familiar = dadosTel ? dadosTel.nome_familiar || '' : '';
+    const parentesco_familiar = dadosTel ? dadosTel.parentesco_familiar || '' : '';
+    const classOculto = tipo === 'Familiar' ? '' : 'oculto';
+
+    // 🌟 CORREÇÃO BOOLEANA AQUI: Se for modoEdicao, NÃO coloca readonly. Se NÃO for modoEdicao, coloca readonly.
+    linha.innerHTML = `
+        <div style="grid-column: span 2;">
+            <label style="font-size: 11px; color: #666;">DDD</label>
+            <input type="text" name="ddd[]" value="${ddd}" placeholder="Ex: 11" maxlength="2" required ${!modoEdicao ? 'readonly' : ''}>
+        </div>
+        <div style="grid-column: span 3;">
+            <label style="font-size: 11px; color: #666;">Número</label>
+            <input type="text" name="numero_telefone[]" value="${numero}" placeholder="99999-9999" required ${!modoEdicao ? 'readonly' : ''}>
+        </div>
+        <div style="grid-column: span 3;">
+            <label style="font-size: 11px; color: #666;">Pertence a</label>
+            <select name="tipo_telefone[]" onchange="toggleCamposFamiliar(this)" ${!modoEdicao ? 'disabled' : ''}>
+                <option value="Paciente" ${tipo === 'Paciente' ? 'selected' : ''}>Paciente</option>
+                <option value="Familiar" ${tipo === 'Familiar' ? 'selected' : ''}>Familiar</option>
+            </select>
+        </div>
+
+        <div class="campos-familiar ${classOculto}" style="grid-column: span 3; display: ${tipo === 'Familiar' ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+                <label style="font-size: 11px; color: #666;">Nome do Parente</label>
+                <input type="text" name="nome_familiar[]" value="${nome_familiar}" placeholder="Nome" ${!modoEdicao ? 'readonly' : ''}>
+            </div>
+            <div>
+                <label style="font-size: 11px; color: #666;">Parentesco</label>
+                <input type="text" name="parentesco_familiar[]" value="${parentesco_familiar}" placeholder="Ex: Mãe" ${!modoEdicao ? 'readonly' : ''}>
+            </div>
+        </div>
+
+        <div style="grid-column: span 1; display: flex; align-items: flex-end; justify-content: flex-end; width: 100%; padding-bottom: 4px;">
+            <button type="button" class="btn-remover-telefone" onclick="removerLinhaTelefone(this)" 
+            style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 10px; display: ${modoEdicao ? 'inline-block' : 'none'};" 
+            ${!modoEdicao ? 'disabled' : ''}>&times;</button>
+        </div>
+    `;
+
+    container.appendChild(linha);
+}
 
 function toggleCamposFamiliar(selectElement) {
     const linha = selectElement.closest('.linha-telefone');
     const camposFamiliar = linha.querySelector('.campos-familiar');
-    const inputsFamiliar = camposFamiliar.querySelectorAll('input');
-
     if (selectElement.value === 'Familiar') {
         camposFamiliar.classList.remove('oculto');
-        inputsFamiliar.forEach(input => input.required = true);
     } else {
         camposFamiliar.classList.add('oculto');
-        inputsFamiliar.forEach(input => {
-            input.required = false;
-            input.value = '';
-        });
+        camposFamiliar.querySelectorAll('input').forEach(i => i.value = ''); 
     }
 }
 
-function adicionarTelefone() {
-    const container = document.getElementById('container-telefones');
-    const novaLinha = document.createElement('div');
-    novaLinha.className = 'linha-telefone';
-    novaLinha.style = 'display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;';
-    
-    novaLinha.innerHTML = `
-        <div style="grid-column: span 2;">
-            <label style="font-size: 11px; color: #666;">DDD</label>
-            <input type="text" name="ddd[]" placeholder="Ex: 11" maxlength="2" required>
-        </div>
-        <div style="grid-column: span 3;">
-            <label style="font-size: 11px; color: #666;">Número</label>
-            <input type="text" name="numero_telefone[]" placeholder="99999-9999" required>
-        </div>
-        <div style="grid-column: span 3;">
-            <label style="font-size: 11px; color: #666;">Pertence a</label>
-            <select name="tipo_telefone[]" onchange="toggleCamposFamiliar(this)">
-                <option value="Paciente">Paciente</option>
-                <option value="Familiar">Familiar</option>
-            </select>
-        </div>
-        <div class="campos-familiar oculto" style="grid-column: span 3;">
-            <label style="font-size: 11px; color: #666;">Familiar (Nome / Parentesco)</label>
-            <input type="text" name="nome_familiar[]" placeholder="Nome" style="margin-bottom: 4px;">
-            <input type="text" name="parentesco_familiar[]" placeholder="Parentesco">
-        </div>
-        <div style="grid-column: span 1; text-align: center;">
-            <button type="button" class="acao" style="background: #dc3545; color: white; border: none; margin-bottom: 4px;" onclick="removerTelefone(this)">&times;</button>
-        </div>
-    `;
-    
-    container.appendChild(novaLinha);
-}
-
-function removerTelefone(botao) {
-    botao.closest('.linha-telefone').remove();
+function removerLinhaTelefone(botao) {
+    const linha = botao.closest('.linha-telefone');
+    if (linha) {
+        linha.remove();
+    }
 }

@@ -118,7 +118,18 @@
                                     data-nome-responsavel="{{ p.nome_responsavel }}"
                                     data-grau-parentesco-responsavel="{{ p.grau_parentesco_responsavel }}"
                                     data-telefone-responsavel="{{ p.telefone_responsavel }}"
-                                    data-telefone="{{ p.telefone }}"
+                                    
+                                    {# 🌟 LINHA CORRIGIDA AQUI: Removido o caractere estranho que estava no final #}
+                                    data-telefones='[{% for t in p.telefones %}{"ddd":"{{t.ddd}}","numero":"{{t.numero}}","tipo":"{{t.tipo}}","nome_familiar":"{{t.nome_familiar or ""}}","parentesco_familiar":"{{t.parentesco_familiar or ""}}"}{% if not loop.last %},{% endif %}{% endfor %}]'
+                                    data-total-telefones="{{ p.telefones|length }}"
+                                    {% for t in p.telefones %}
+                                    data-tel-ddd-{{ loop.index0 }}="{{ t.ddd }}"
+                                    data-tel-numero-{{ loop.index0 }}="{{ t.numero }}"
+                                    data-tel-tipo-{{ loop.index0 }}="{{ t.tipo }}"
+                                    data-tel-nome-{{ loop.index0 }}="{{ t.nome_familiar or '' }}"
+                                    data-tel-parentesco-{{ loop.index0 }}="{{ t.parentesco_familiar or '' }}"
+                                    {% endfor %}
+                                    
                                     data-municipio="{{ p.municipio }}"
                                     data-uf="{{ p.uf }}"
                                     data-zona="{{ p.zona }}"
@@ -140,7 +151,8 @@
                                 👁
                             </button>
 
-                            <button class="btn btn-sm btn-outline-secondary"
+                            <button data-readonly="False"
+                                    class="btn btn-sm btn-outline-secondary"
                                     style="padding: 1px 6px; font-size: 13px;"
                                     type="button"
                                     onclick="abrirPaciente(this, 'edit')"
@@ -162,7 +174,18 @@
                                     data-nome-responsavel="{{ p.nome_responsavel }}"
                                     data-grau-parentesco-responsavel="{{ p.grau_parentesco_responsavel }}"
                                     data-telefone-responsavel="{{ p.telefone_responsavel }}"
-                                    data-telefone="{{ p.telefone }}"
+                                    
+                                    {# 🌟 ADICIONADO AQUI TAMBÉM: ENVIA A LISTA EM FORMATO COMPATÍVEL JSON #}
+                                    data-telefones='[{% for t in p.telefones %}{"ddd":"{{t.ddd}}","numero":"{{t.numero}}","tipo":"{{t.tipo}}","nome_familiar":"{{t.nome_familiar or ""}}","parentesco_familiar":"{{t.parentesco_familiar or ""}}"}{% if not loop.last %},{% endif %}{% endfor %}]'
+                                    data-total-telefones="{{ p.telefones|length }}"
+                                    {% for t in p.telefones %}
+                                    data-tel-ddd-{{ loop.index0 }}="{{ t.ddd }}"
+                                    data-tel-numero-{{ loop.index0 }}="{{ t.numero }}"
+                                    data-tel-tipo-{{ loop.index0 }}="{{ t.tipo }}"
+                                    data-tel-nome-{{ loop.index0 }}="{{ t.nome_familiar or '' }}"
+                                    data-tel-parentesco-{{ loop.index0 }}="{{ t.parentesco_familiar or '' }}"
+                                    {% endfor %}
+                                    
                                     data-municipio="{{ p.municipio }}"
                                     data-uf="{{ p.uf }}"
                                     data-zona="{{ p.zona }}"
