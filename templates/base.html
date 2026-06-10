@@ -11,61 +11,67 @@
 
 <!-- 🔝 MENU  -->
   <nav class="menucompleto navbar fixed-top">
-    <div class="container-fluid">
-      <div class="sidebar sidebar-expanded container-fluid d-flex justify-content-start align-items-center">
-        <button onclick="toggleSidebar()" class="navbar-toggler menu-toggle" type="button" aria-label="Abrir menu">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div id="sidebarMenu" class="closed" tabindex="-1" aria-labelledby="offcanvasNavbarLabel">
-          <div class="sidebar-panel">
-            
+  <div class="container-fluid">
+    <div class="sidebar container-fluid d-flex justify-content-start align-items-center">
+      
+      <button onclick="toggleSidebar()" class="navbar-toggler menu-toggle" type="button" aria-label="Abrir menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
 
-            <ul class="navbar-nav sidebar-nav" style="padding: 15px;">
-              <li class="nav-item">
-                <a class="nav-link {% if rota_atual == '/dashboard' %}active{% endif %}" href="/dashboard">
-                  <img src="../static/house_3661264.png" alt="" class="nav-icon">
-                  <span>Dashboard</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link {% if rota_atual == '/pacientes' %}active{% endif %}" href="/pacientes">
-                  <img src="../static/medical-staff_12248967.png" alt="" class="nav-icon">
-                  <span>Pacientes</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link {% if rota_atual == '/atendimentos' %}active{% endif %}" href="/atendimentos">
-                  <img src="../static/medical-report_18526763.png" alt="" class="nav-icon">
-                  <span>Atendimentos</span>
-                </a>
-              </li>
-              <li class="nav-item sidebar-logout">
-                <a class="nav-link" href="/logout">
-                  <span>Sair</span>
-                </a>
-              </li>
-            </ul>
+      <div id="sidebarMenu" tabindex="-1" aria-labelledby="offcanvasNavbarLabel">
+        <div class="sidebar-panel">
+          <ul class="navbar-nav sidebar-nav" style="padding: 15px;">
+            
+            <li class="nav-item">
+              <a class="nav-link {% if rota_atual == '/dashboard' %}active{% endif %}" href="/dashboard">
+                <img src="{{ url_for('static', filename='house_3661264.png') }}" alt="Home" class="nav-icon">
+                <span>Dashboard</span>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link {% if rota_atual == '/pacientes' %}active{% endif %}" href="/pacientes">
+                <img src="{{ url_for('static', filename='medical-staff_12248967.png') }}" alt="Pacientes" class="nav-icon">
+                <span>Pacientes</span>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link {% if rota_atual == '/atendimentos' %}active{% endif %}" href="/atendimentos">
+                <img src="{{ url_for('static', filename='medical-report_18526763.png') }}" alt="Atendimentos" class="nav-icon">
+                <span>Atendimentos</span>
+              </a>
+            </li>
+
+            <li class="nav-item sidebar-logout">
+              <a class="nav-link" href="/logout">
+                <img src="{{ url_for('static', filename='sair.png') }}" alt="Sair" class="nav-icon">
+                <span>Sair</span>
+              </a>
+            </li>
+
+          </ul>
         </div>
       </div>
+
       <div class="dropdown ms-auto d-flex justify-content-end">
-        <a class="d-flex align-items-center text-decoration-none dropdown-toggle"
-          href="#"
-          data-bs-toggle="dropdown">
-
-          <img src="{% if usuario_foto %}{{ url_for('static', filename=usuario_foto) }}{% else %}{{ url_for('static', filename=utilizador) }}{% endif %}"
-            class="rounded-circle me-2 avatar-menu">
-            <strong>{{ usuario }}</strong> 
+        <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#" data-bs-toggle="dropdown">
+          {% if usuario_foto %}
+            <img src="{{ url_for('static', filename=usuario_foto) }}" class="rounded-circle me-2 avatar-menu">
+          {% else %}
+            <img src="{{ url_for('static', filename='utilizador.png') }}" class="rounded-circle me-2 avatar-menu">
+          {% endif %}
+          <strong>{{ usuario }}</strong> 
+        </a>
         <ul class="dropdown-menu dropdown-menu-end">
-
           <li><a class="dropdown-item" href="#" onclick="abrirModalPerfil()">Perfil</a></li>
           <li><a class="dropdown-item" href="#">Configurações</a></li>
-
           <li><hr class="dropdown-divider"></li>
-
           <li><a class="dropdown-item text-danger" href="/logout">Sair</a></li>
-
         </ul>
       </div>
+
     </div>
   </div>
 </nav>
@@ -82,10 +88,11 @@
 
     <form action="/atualizar_perfil" method="post" enctype="multipart/form-data">
       <div class="perfil-topo">
-        <img
-          src="{% if servidor['foto_perfil'] %}{{ url_for('static', filename=servidor['foto_perfil']) }}{% else %}https://via.placeholder.com/96{% endif %}"
-          class="avatar-perfil"
-          alt="Foto do perfil">
+        {% if usuario_foto %}
+          <img src="{{ url_for('static', filename=usuario_foto) }}" class="avatar-perfil">
+        {% else %}
+          <img src="{{ url_for('static', filename='utilizador.png') }}" class="avatar-perfil">
+        {% endif %}
         <div>
           <label>Foto de perfil</label>
           <input type="file" name="foto_perfil" accept="image/png,image/jpeg,image/webp">

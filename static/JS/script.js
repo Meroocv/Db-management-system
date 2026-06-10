@@ -279,12 +279,8 @@ function abrirAba(aba, link) {
 }
 
 function toggleSidebar() {
-  document.getElementById("sidebarMenu").classList.toggle("closed");
-
-  const main = document.querySelector(".main-content");
-  if (main) {
-    main.classList.toggle("shift");
-  }
+    // Liga e desliga a expansão direto no body da página
+    document.body.classList.toggle('sidebar-expanded');
 }
 
 function abrirModalPerfil() {

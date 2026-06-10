@@ -1,37 +1,6 @@
-.menucompleto {
-    min-height: 58px;
-    background: #ffffff;
-    color: #1f2937;
-    border-bottom: 1px solid #e6eaf0;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-}
-
-
-table {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-.tabela-container {
-    overflow-x: auto;   /* 👈 scroll lateral */
-    overflow-y: auto;
-    max-height: 500px;
-}
-
-th {
-    background: #333;
-    color: white;
-}
-
-td, th {
-    padding: 10px;
-    text-align: left;
-}
-
-th, td {
-    white-space: nowrap;  /* 👈 impede quebrar linha */
-}
-
+/* ==========================================================================
+   1. CONFIGURAÇÕES GERAIS E ESTRUTURA
+   ========================================================================== */
 body {
     font-family: Arial, sans-serif;
     background-color: #f4f6f8;
@@ -39,63 +8,69 @@ body {
 }
 
 body > form {
-  width: min(92vw, 420px);
-  margin: 20px auto;
+    width: min(92vw, 420px);
+    margin: 20px 0;
 }
 
-        /* MENU SUPERIOR */
-        .menu {
-            padding: 15px;
-            border-bottom: 3px solid #f3f4f8;;
-            display: flex;
-            justify-content: space-between;
-        }
+.container {
+    padding: 20px;
+}
 
-        .menu a {
-            color: white;
-            margin-right: 15px;
-            text-decoration: none;
-            font-weight: bold;
-        }
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    
+    /* ⚡ Os ajustes de alinhamento aqui: */
+    margin: 0 0 20px 0;    /* 👈 Zera as margens laterais (alinha à esquerda) e deixa 20px de espaço embaixo */
+    max-width: 800px;      /* 👈 Mantém o limite de largura para os filtros não virarem uma tripa gigante */
+    width: 100%;           /* 👈 Garante que ele seja responsivo em telas menores que 800px */
+    box-sizing: border-box; /* Garante que o padding não quebre a largura */
+}
 
-        .container {
-            padding: 20px;
-        }
+.cardzinho {
+    max-width: 300px;
+    max-height: 130px;
+}
 
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 800px;
-            margin: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+.logo{
+    width: 150px;
+    margin-left: 30px;
+}
 
-        h2 {
-            text-align: center;
-        }
 
-        label {
-            font-weight: bold;
-            margin-top: 10px;
-            display: block;
-        }
+h2 {
+    text-align: center;
+}
 
-        input, select {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            box-sizing: border-box;
-        }
+label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    box-sizing: border-box;
+}
+
+input[readonly] {
+    background-color: #f3f3f3;
+    border: 1px solid #ddd;
+    cursor: not-allowed;
+}
 
 .checkbox-group {
     margin-top: 10px;
 }
 
-        .checkbox-group label {
-            font-weight: normal;
-            display: block;
-        }
+.checkbox-group label {
+    font-weight: normal;
+    display: block;
+}
 
 .checkbox-group input[type="checkbox"] {
     width: auto;
@@ -103,14 +78,225 @@ body > form {
     min-height: auto;
 }
 
-        textarea {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            box-sizing: border-box;
-        }
+textarea {
+    resize: vertical;
+}
 
+/* ==========================================================================
+   2. MENUS (SUPERIOR E LATERAL RETRÁTIL) - REFEITO E SINCRONIZADO
+   ========================================================================== */
+.menucompleto {
+    min-height: 80px;
+    background: #ffffff;
+    color: #1f2937;
+    border-bottom: 1px solid #e6eaf0;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
 
+/* Menu Superior Antigo */
+.menu {
+    padding: 15px;
+    border-bottom: 3px solid #f3f4f8;
+    display: flex;
+    justify-content: space-between;
+}
+
+.menu a {
+    color: white;
+    margin-right: 15px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* ESTADO PADRÃO: MENU FECHADO (MINI SIDEBAR)
+   O sistema herda este estado assim que a página carrega.
+*/
+#sidebarMenu {
+    position: fixed;
+    top: 80px;
+    left: 0;
+    height: calc(100vh - 56px);
+    width: 75px; /* Começa encolhido mostrando apenas os ícones */
+    background: #ffffff;
+    z-index: 1020;
+    border-right: 3px solid #f3f4f8;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    transition: width 0.3s ease; /* Transição suave de largura */
+    overflow-x: hidden;
+}
+
+/* Links do Menu */
+.sidebar-nav .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 10px 5px; /* Padding ajustado para melhor centralização dos ícones */
+    white-space: nowrap; 
+}
+
+/* 1. Garante que o painel interno ocupe 100% da altura disponível do #sidebarMenu */
+.sidebar-panel {
+    height: 100%;
+}
+
+/* 2. Transforma a lista de navegação em um bloco Flexbox em coluna */
+.sidebar-nav {
+    display: flex !important;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box; /* Garante que o padding de 15px não quebre a altura */
+}
+
+/* 3. ⚡ O TRUQUE: Empurra o item do "Sair" para o final do container */
+.sidebar-logout {
+    margin-top: auto; 
+    padding-bottom: 10px; /* Um pequeno respiro para não colar totalmente no chão */
+}
+
+/* Ícones do Menu */
+.nav-icon {
+    width: 35px;
+    height: 35px;
+    margin-right: 25px; /* Espaço generoso para afastar do texto interno */
+    flex-shrink: 0; /* Impede o ícone de amassar ou deformar */
+}
+
+/* Texto do link oculto por padrão (Menu Fechado) */
+.sidebar-nav .nav-link span {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease-in-out;
+}
+
+/* Conteúdo Principal da Página (Acompanha o menu de 75px) */
+.main-content {
+    margin-top: 15px;
+    margin-left: 75px; /* Alinhado perfeitamente com a mini barra */
+    transition: margin-left 0.3s ease; /* Mesma velocidade do menu para não dessincronizar */
+    padding: 20px;
+}
+
+/* Avatar do Menu Superior */
+.avatar-menu {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+}
+
+/* ==========================================================================
+   ESTILIZAÇÃO DO BOTÃO TOGGLE (HAMBÚRGUER)
+   ========================================================================== */
+.menu-toggle {
+    border: none !important;            /* Remove a borda padrão quadrada */
+    background: transparent !important;  /* Garante fundo transparente inicial */
+    padding: 8px !important;
+    border-radius: 8px;                 /* Cantos arredondados suaves */
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ⚡ ADEUS EFEITO FEIO: Remove a linha/sombra azul de foco do Bootstrap */
+.menu-toggle:focus, 
+.menu-toggle:active,
+.menu-toggle:focus-visible {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Efeito Hover - Quando passa o mouse por cima */
+.menu-toggle:hover {
+    background-color: #f3f4f6 !important; /* Um cinza bem sutil e elegante */
+}
+
+/* Efeito Active - Quando o usuário clica de fato (Efeito "Pressionado") */
+.menu-toggle:active {
+    transform: scale(0.92);              /* O botão encolhe levemente ao clicar */
+    background-color: #e5e7eb !important; /* Escurece o cinza de fundo no clique */
+}
+
+/* Garante que o ícone de dentro acompanhe o tamanho */
+.menu-toggle .navbar-toggler-icon {
+    width: 22px;
+    height: 22px;
+}
+
+/* ==========================================================================
+   ESTADO EXPANDIDO (Ativado via clique no botão pelo JavaScript)
+   ========================================================================== */
+
+/* Menu alarga para exibir os textos */
+body.sidebar-expanded #sidebarMenu {
+    width: 240px;
+}
+
+/* O texto surge com um efeito fade-in elegante */
+body.sidebar-expanded .sidebar-nav .nav-link span {
+    opacity: 1;
+    visibility: visible;
+    /* O pequeno 'delay' de 0.1s espera a barra abrir um pouco antes de mostrar o texto */
+    transition: opacity 0.2s ease-in-out 0.1s; 
+}
+
+/* Conteúdo principal abre espaço para a barra maior */
+body.sidebar-expanded .main-content {
+    margin-left: 240px;
+}
+/* ==========================================================================
+   3. TABELAS
+   ========================================================================== */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+
+.table-wrapper {
+    width: 100%;
+}
+
+.tabela-container {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 500px;
+    table-layout: auto;
+}
+
+.tabela-container th {
+    background: #333;
+    color: white;
+    border: 1px solid red; /* Mantido seu sinalizador visual */
+}
+
+.table td, .table th {
+    max-height: 100px;
+    height: 45px;
+}
+
+.tabela-container th,
+.tabela-container td {
+    padding: 6px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsividade e Larguras das Colunas da Tabela */
+.table-responsive { min-width: 800px; }
+td:nth-child(1), th:nth-child(1) { min-width: 20px; max-width: 20px; }
+td:nth-child(2), th:nth-child(2) { max-width: 80px; }
+td:nth-child(3), th:nth-child(3) { max-width: 35px; }
+td:nth-child(4), th:nth-child(4) { max-width: 45px; }
+td:nth-child(5), th:nth-child(5) { max-width: 50px; }
+td:nth-child(6), th:nth-child(6) { max-width: 50px; }
+td:nth-child(7), th:nth-child(7) { max-width: 25px; }
+
+/* ==========================================================================
+   4. MODAIS E FORM GRIDS
+   ========================================================================== */
 .modal {
     display: none;
     position: fixed;
@@ -123,6 +309,7 @@ body > form {
 }
 
 .modal-content {
+    position: relative;
     background: white;
     margin: 5% auto;
     padding: 20px;
@@ -136,99 +323,33 @@ body > form {
 .modal-content input,
 .modal-content select,
 .modal-content textarea {
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  min-height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    min-height: 38px;
 }
 
 .modal-content input:focus,
 .modal-content select:focus,
 .modal-content textarea:focus {
-  border-color: #86b7fe;
-  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
-  outline: none;
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    outline: none;
 }
 
-.modal-content textarea {
-  resize: vertical;
+.close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #555;
+    cursor: pointer;
+    transition: 0.2s;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 12px 16px;
-  margin-top: 16px;
-}
-
-.aba.form-grid[style*="block"],
-.aba.form-grid[style*="grid"] {
-  display: grid !important;
-}
-
-.campo {
-  grid-column: span 6;
-}
-
-.campo-largo {
-  grid-column: 1 / -1;
-}
-
-.campo-medio {
-  grid-column: span 6;
-}
-
-.campo-curto {
-  grid-column: span 3;
-}
-
-.campo-minimo {
-  grid-column: span 2;
-}
-
-.campo label,
-.campo-largo label,
-.campo-medio label,
-.campo-curto label,
-.campo-minimo label {
-  margin-top: 0;
-}
-
-.acoes-form {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.acoes-form button {
-  width: auto;
-  padding: 8px 14px;
-}
-
-.form-grid > br {
-  display: none;
-}
-
-.form-grid > button {
-  grid-column: 1 / -1;
-  justify-self: end;
-  width: auto;
-  padding: 8px 14px;
-  margin-top: 6px;
-}
-
-@media (max-width: 900px) {
-  .modal-content {
-    width: min(94vw, 720px);
-  }
-
-  .campo,
-  .campo-largo,
-  .campo-medio,
-  .campo-curto,
-  .campo-minimo {
-    grid-column: 1 / -1;
-  }
+.close:hover {
+    color: red;
+    transform: scale(1.2);
 }
 
 .fechar {
@@ -238,230 +359,116 @@ body > form {
 }
 
 .tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid #ddd;
-  margin-bottom: 15px;
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 15px;
 }
 
-input[readonly] {
-  background-color: #f3f3f3;
-  border: 1px solid #ddd;
-  cursor: not-allowed;
+/* Form Grid System */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px 16px;
+    margin-top: 16px;
 }
 
-#sidebarMenu {
-  position: fixed;
-  top: 56px;
-  left: 0;
-  height: calc(100vh - 56px);
-  width: 250px;
-
-  transform: translateX(0px);
-  transition: transform 0.3s ease;
-
-  background: #fafbff;
-  z-index: 1040;
-  border-right: 3px solid #f3f4f8;
+.aba.form-grid[style*="block"],
+.aba.form-grid[style*="grid"] {
+    display: grid !important;
 }
 
-/* fechado */
-#sidebarMenu.closed {
-  transform: translateX(-250px);
+.campo { grid-column: span 6; }
+.campo-largo { grid-column: 1 / -1; }
+.campo-medio { grid-column: span 6; }
+.campo-curto { grid-column: span 3; }
+.campo-minimo { grid-column: span 2; }
+
+.campo label, .campo-largo label, .campo-medio label, .campo-curto label, .campo-minimo label {
+    margin-top: 0;
 }
 
-/* conteúdo da página */
-.main-content {
-  margin-top: 15px;
-  margin-left: 0;
-  transition: 0.3s;
+.acoes-form, .acoes-modal {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
 }
 
-.main-content.shift {
-  margin-left: 250px;
+.acoes-form button, .acoes-modal button, .modal-perfil button {
+    width: auto;
+    padding: 8px 14px;
 }
 
-.table-wrapper {
-  width: 100%;
+.form-grid > br { display: none; }
+.form-grid > button {
+    grid-column: 1 / -1;
+    justify-self: end;
+    width: auto;
+    padding: 8px 14px;
+    margin-top: 6px;
 }
 
-.tabela-container {
-  width: 100%;
-  table-layout: auto;
-  font-size: 13px;
-}
+.acao { padding: 4px 8px; }
 
-.tabela-container th {
-  border: 1px solid red;
-}
-
-
-.tabela-container td{
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tabela-container th,
-.tabela-container td {
-  padding: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Prontuário (número pequeno) */
-td:nth-child(1), th:nth-child(1) {
-    min-width: 20px;
-    max-width: 20px;
-}
-
-td:nth-child(2), th:nth-child(2) {
-    max-width: 80px;
-}
-
-/* CPF (tamanho fixo lógico) */
-td:nth-child(3), th:nth-child(3) {
-  max-width: 35px;
-}
-
-/* Data */
-td:nth-child(4), th:nth-child(4) {
-  max-width: 45px;
-}
-
-td:nth-child(5), th:nth-child(5) {
-  max-width: 50px;
-}
-
-/* Status */
-td:nth-child(6), th:nth-child(6) {
-  max-width: 50px;
-}
-
-/* Ações */
-td:nth-child(7), th:nth-child(7) {
-  max-width: 25px;
-}
-
-table{
-    font-size: 13px;
-}
-
-.cardzinho{
-    max-width: 300px;
-    max-height: 130px;
-}
-
-.card{
-    margin:0;
-    padding:0;
-}
-
-.modal-content {
-  position: relative;
-}
-
-.close {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  font-size: 28px;
-  font-weight: bold;
-  color: #555;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.close:hover {
-  color: red;
-  transform: scale(1.2);
-}
-
-.avatar-menu {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-}
-
+/* Modal Perfil Específico */
 .modal-perfil {
-  max-width: 560px;
-  width: min(92vw, 560px);
+    max-width: 560px;
+    width: min(92vw, 560px);
 }
 
 .perfil-topo {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 12px;
 }
 
 .avatar-perfil {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #eef1f6;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #eef1f6;
 }
 
 .modal-perfil small {
-  color: #6c757d;
-  display: block;
-  margin-top: 4px;
+    color: #6c757d;
+    display: block;
+    margin-top: 4px;
 }
 
-.acoes-modal {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.acoes-modal button,
-.modal-perfil button {
-  width: auto;
-  padding: 8px 14px;
-}
-
-.acao{
-  padding: 4px 8px;
-}
-
+/* ==========================================================================
+   5. OUTROS / AUXILIARES / RESPONSIVIDADE
+   ========================================================================== */
 .truncate-2-lines {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-  white-space: normal;       /* ESSENCIAL */
-  word-break: break-word;    /* quebra palavras grandes */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    white-space: normal;
 }
-
-
 
 .painel-rh {
-  max-width: none;
-  margin-top: 20px;
-  padding: 0;
+    max-width: none;
+    margin-top: 20px;
+    padding: 0;
+}
+
+@media (max-width: 900px) {
+    .modal-content {
+        width: min(94vw, 720px);
+    }
+    .campo, .campo-largo, .campo-medio, .campo-curto, .campo-minimo {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 600px) {
-  .perfil-topo {
-    grid-template-columns: 1fr;
-  }
-}
-
-.nav-icon{
-  width: 15%;
-}
-
-.table-responsive{
-  min-width: 800px;
-}
-
-.table td, 
-.table th{
-    max-height: 100px;
-    height: 45px; /* altura padrão */
+    .perfil-topo {
+        grid-template-columns: 1fr;
+    }
 }
