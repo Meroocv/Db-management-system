@@ -439,6 +439,41 @@ td:nth-child(7), th:nth-child(7) { max-width: 25px; }
     margin-top: 4px;
 }
 
+/* Transforma o grupo de procedimentos em um grid de 2 colunas */
+#grupo_procedimentos {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Divide em 2 colunas de tamanhos iguais */
+    gap: 10px 20px; /* Espaçamento: 10px entre linhas, 20px entre colunas */
+    padding: 10px;
+    background-color: #fcfcfc; /* Um fundo sutil para organizar visualmente */
+    border: 1px solid #eef2f5;
+    border-radius: 6px;
+}
+
+/* Alinha o quadradinho do checkbox perfeitamente com o texto */
+#grupo_procedimentos label {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Distância entre o quadradinho e o texto do procedimento */
+    cursor: pointer;
+    font-size: 14px;
+    color: #444;
+    transition: color 0.2s;
+}
+
+/* Efeito sutil ao passar o mouse por cima do procedimento */
+#grupo_procedimentos label:hover {
+    color: #000;
+}
+
+/* Garante que o input não mude de tamanho */
+#grupo_procedimentos input[type="checkbox"] {
+    cursor: pointer;
+    margin: 0;
+    width: 16px;
+    height: 16px;
+}
+
 /* ==========================================================================
    5. OUTROS / AUXILIARES / RESPONSIVIDADE
    ========================================================================== */

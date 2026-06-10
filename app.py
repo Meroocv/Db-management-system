@@ -131,6 +131,41 @@ class Atendimento(db.Model):
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
 
 
+class ConsultaFutura(db.Model):
+    __tablename__ = 'consultas_futuras'
+
+    id = db.Column(db.Integer, primary_key=True)
+    atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
+    data = db.Column(db.String(10))
+    hora = db.Column(db.String(5))
+    profissional = db.Column(db.String(100))
+
+class PactuacaoGrupo(db.Model):
+    __tablename__ = 'pactuacoes_grupos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
+    tipo = db.Column(db.String(50)) # 'Grupo Terapeutico' ou 'Acolhimento Diurno'
+    data_inicio = db.Column(db.String(10))
+    data_fim = db.Column(db.String(10))
+    dias_semana = db.Column(db.String(100)) # Guardará "Seg,Ter" ou None
+
+
+# 1. Tabela para controlar quais CBOs têm direito a agenda
+class ConfigCbo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cbo_codigo = db.Column(db.String(10), unique=True, nullable=False)
+    nome_cbo = db.Column(db.String(100), nullable=False)
+    agenda_ativa = db.Column(db.Boolean, default=True)
+
+# 2. Tabela para bloquear dias por profissional
+class Afastamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    profissional = db.Column(db.String(100), nullable=False) # Nome ou ID do profissional
+    data_inicio = db.Column(db.String(10), nullable=False)   # Formato YYYY-MM-DD
+    data_fim = db.Column(db.String(10), nullable=False)      # Formato YYYY-MM-DD
+    motivo = db.Column(db.String(100), nullable=False)       # Férias, Licença Médica, etc.
+
 # ==========================================
 # CONFIGURAÇÕES E AUXILIARES
 # ==========================================
@@ -420,17 +455,21 @@ def novo_atendimento():
         return jsonify({'erro': 'Usuario nao autenticado'}), 401
 
     dados = request.get_json()
+    if not dados:
+        return jsonify({'erro': 'Dados não enviados corretamente'}), 400
+
     prontuario = dados.get('prontuario', '').strip()
 
     if not prontuario:
         return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
 
-    # Ltrim implementado nativamente via string no python ou no db.func.ltrim
+    # Busca o paciente ignorando zeros à esquerda
     paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
 
     if not paciente:
         return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
+    # 1. Salva o Atendimento Principal
     novo = Atendimento(
         prontuario=paciente.prontuario,
         data_atendimento=dados.get('data_atendimento'),
@@ -443,8 +482,46 @@ def novo_atendimento():
     )
     
     db.session.add(novo)
-    db.session.commit()
-    return jsonify({'mensagem': 'Atendimento cadastrado com sucesso!'})
+    db.session.flush() # Gera o ID do 'novo' atendimento para usarmos logo abaixo
+
+    # 2. Salva as Consultas Individuais Futuras (se houverem no JSON)
+    datas_con = dados.get('data_proxima_consulta', [])
+    horas_con = dados.get('hora_proxima_consulta', [])
+    prof_con = dados.get('profissional_proxima_consulta', [])
+
+    for i in range(len(datas_con)):
+        if datas_con[i]: # Só salva se a data foi preenchida
+            nova_con = ConsultaFutura(
+                atendimento_id=novo.id,
+                data=datas_con[i],
+                hora=horas_con[i] if i < len(horas_con) else '',
+                profissional=prof_con[i] if i < len(prof_con) else ''
+            )
+            db.session.add(nova_con)
+
+    # 3. Salva as Pactuações de Grupos / Acolhimento Diurno
+    tipos_pac = dados.get('tipo_pactuacao_periodo', [])
+    dt_inicio_pac = dados.get('data_inicio_pactuacao', [])
+    dt_fim_pac = dados.get('data_fim_pactuacao', [])
+    dias_esp = dados.get('dias_semana_acolhimento', [])
+
+    for i in range(len(tipos_pac)):
+        if tipos_pac[i]:
+            tipo = tipos_pac[i]
+            # Se for Acolhimento Diurno, captura a string de dias (ex: "Ter,Qui")
+            dias = dias_esp[i] if (tipo == 'Acolhimento Diurno' and i < len(dias_esp)) else None
+            
+            nova_pac = PactuacaoGrupo(
+                atendimento_id=novo.id,
+                tipo=tipo,
+                data_inicio=dt_inicio_pac[i] if i < len(dt_inicio_pac) else '',
+                data_fim=dt_fim_pac[i] if i < len(dt_fim_pac) else '',
+                dias_semana=dias
+            )
+            db.session.add(nova_pac)
+
+    db.session.commit() # Grava tudo permanentemente de uma vez só
+    return jsonify({'mensagem': 'Atendimento e pactuações cadastrados com sucesso!'})
 
 
 @app.route('/atualizar_atendimento', methods=['POST'])
@@ -614,6 +691,81 @@ def buscar_paciente():
 
     return jsonify({"erro": "Paciente nao encontrado"}), 404
 
+@app.route('/agendas')
+def agendas():
+    if 'usuario' not in session:
+        return redirect('/')
+
+    # Exemplo de dados de agenda (substitua com consulta real ao banco)
+    agendas = [
+        {"data": "2024-07-01", "hora": "10:00", "profissional": "Dr. Silva", "tipo": "Consulta"},
+        {"data": "2024-07-02", "hora": "14:00", "profissional": "Dra. Souza", "tipo": "Acolhimento Diurno"},
+    ]
+
+    contexto = contexto_usuario()
+    contexto['agendas'] = agendas
+    return render_template('agendas.html', **contexto)
+
+@app.route('/configurar_agenda')
+def tela_configurar_agenda():
+    if 'usuario' not in session:
+        return redirect('/')
+        
+    # Puxa os CBOs que já estão ativos no banco
+    cbos_ativos_db = ConfigCbo.query.filter_by(agenda_ativa=True).all()
+    cbos_configurados_ativos = [c.cbo_codigo for c in cbos_ativos_db]
+    
+    # Puxa todos os afastamentos agendados
+    afastamentos = Afastamento.query.all()
+
+    contexto = contexto_usuario() # Mantém seu contexto da Opção A
+    return render_template(
+        'configurar_agenda.html', 
+        afastamentos=afastamentos, 
+        cbos_configurados_ativos=cbos_configurados_ativos,
+        **contexto
+    )
+
+@app.route('/salvar_config_cbo', methods=['POST'])
+def salvar_config_cbo():
+    # Pega a lista de CBOs marcados no formulário
+    cbos_marcados = request.form.getlist('cbos_ativos')
+    
+    # Reseta todos para inativos primeiro
+    ConfigCbo.query.update({ConfigCbo.agenda_ativa: False})
+    
+    # Atualiza ou insere os marcados como ativos
+    for cbo_cod in cbos_marcados:
+        cbo_nome = CBO_OPCOES.get(cbo_cod, "Especialidade")
+        config = ConfigCbo.query.filter_by(cbo_codigo=cbo_cod).first()
+        if config:
+            config.agenda_ativa = True
+        else:
+            nova_config = ConfigCbo(cbo_codigo=cbo_cod, nome_cbo=cbo_nome, agenda_ativa=True)
+            db.session.add(nova_config)
+            
+    db.session.commit()
+    return redirect('/configurar_agenda')
+
+@app.route('/salvar_afastamento', methods=['POST'])
+def salvar_afastamento():
+    novo_afas = Afastamento(
+        profissional=request.form.get('profissional'),
+        data_inicio=request.form.get('data_inicio'),
+        data_fim=request.form.get('data_fim'),
+        motivo=request.form.get('motivo')
+    )
+    db.session.add(novo_afas)
+    db.session.commit()
+    return redirect('/configurar_agenda')
+
+@app.route('/deletar_afastamento/<int:id>')
+def deletar_afastamento(id):
+    afas = Afastamento.query.get(id)
+    if afas:
+        db.session.delete(afas)
+        db.session.commit()
+    return redirect('/configurar_agenda')
 
 # ==========================================
 # INICIALIZAÇÃO DA BASE DE DADOS

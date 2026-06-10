@@ -7,7 +7,7 @@
   </div>
   
   <div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="card mb-4 shadow-sm border-0">
+    <div class="card mb-4 shadow-sm border-0 flex-grow-1 me-3">
       <div class="card-body">
         <div class="row g-2">
           <div class="col-md-4">
@@ -30,8 +30,9 @@
         </div>
       </div>
     </div>
-    <div class="d-flex justify-content-end"> 
-        <button class="btn btn-primary" onclick="abrirModalAtendimento()">+ Novo atendimento</button>
+    
+    <div class="d-flex justify-content-end align-self-start pt-2"> 
+      <button class="btn btn-primary" onclick="abrirModalAtendimento()">+ Novo atendimento</button>
     </div>
   </div>
 
@@ -100,22 +101,28 @@
   <div class="modal-content">
     <span class="close" onclick="fecharModalAtendimento()">&times;</span>
     <h2 id="tituloModalAtendimento">Registrar Atendimento</h2>
+    
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item"><a class="nav-link active" role="button" onclick="abrirAbaAtendimento('Atendimento', this)">Geral</a></li>
+      <li class="nav-item"><a class="nav-link" role="button" onclick="abrirAbaAtendimento('pactuacao', this)">Pactuação</a></li>
+      <li class="nav-item"><a class="nav-link" role="button" onclick="abrirAbaAtendimento('detalhe', this)">Detalhes</a></li>
+    </ul>
 
-    <div class="form-grid">
+    <div id="tab_Atendimento" class="aba-conteudo form-grid">
       <input type="hidden" id="modo_atendimento" value="novo">
       <input type="hidden" id="atendimento_id">
 
-      <label>Prontuario:</label>
-      <input type="text" id="prontuario_atendimento" inputmode="numeric" required>
+      <label>Prontuário:</label>
+      <input type="text" id="prontuario_atendimento" inputmode="numeric" required class="form-control">
 
       <label>Nome do Paciente:</label>
-      <input type="text" id="nome_paciente_atendimento" readonly>
+      <input type="text" id="nome_paciente_atendimento" readonly class="form-control">
 
-      <label>Data:</label>
-      <input type="date" id="data_atendimento" required>
+      <label>Data do Atendimento:</label>
+      <input type="date" id="data_atendimento" required class="form-control">
 
       <label>Procedimentos:</label>
-      <div class="checkbox-group">
+      <div class="checkbox-group" id="grupo_procedimentos">
         <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento inicial">Acolhimento Inicial</label>
         <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento Diurno">Acolhimento Diurno</label>
         <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual">Atendimento Individual</label>
@@ -129,28 +136,78 @@
         <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo">Atividade em Grupo</label>
         <label><input type="checkbox" name="procedimentos_atendimento" value="Falta"> Falta</label>
       </div>
+    </div>
 
+    <div id="tab_pactuacao" class="aba-conteudo form-grid" style="display:none;">
+  
+      <div class="grid-full-width border-bottom pb-4 mb-3">
+        <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="checkbox" id="marcar_consulta_futura" onchange="toggleSecaoPactuacao('container_consultas_lista', this)" style="width: 18px; height: 18px; min-width: 18px; flex-shrink: 0; margin: 0; cursor: pointer;">
+          <span>Agendar próxima consulta/retorno para este paciente?</span>
+        </label>
+        
+        <div id="container_consultas_lista" style="display: none;">
+          <div class="row g-2 mb-1 d-none d-md-flex" style="font-size: 13px; font-weight: 500; color: #666;">
+            <div class="col-md-3">Data</div>
+            <div class="col-md-2">Horário</div>
+            <div class="col-md-5">Profissional do Retorno</div>
+            <div class="col-md-2">Ação</div>
+          </div>
+          
+          <div id="lista_consultas_futuras"></div>
+          
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="adicionarLinhaConsulta()">
+            + Adicionar Nova Consulta
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-full-width">
+        <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="checkbox" id="marcar_grupo_futuro" onchange="toggleSecaoPactuacao('container_grupos_lista', this)" style="width: 18px; height: 18px; min-width: 18px; flex-shrink: 0; margin: 0; cursor: pointer;">
+          <span>Pactuar participação em Grupos ou Acolhimento Diurno?</span>
+        </label>
+        
+        <div id="container_grupos_lista" style="display: none;">
+          <div class="row g-2 mb-1 d-none d-md-flex" style="font-size: 13px; font-weight: 500; color: #666;">
+            <div class="col-md-3">Tipo de Pactuação</div>
+            <div class="col-md-3">Data Início</div>
+            <div class="col-md-3">Data Fim (Previsão)</div>
+            <div class="col-md-3">Ação</div>
+          </div>
+          
+          <div id="lista_grupos_futuros"></div>
+          
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="adicionarLinhaGrupo()">
+            + Vincular a Grupo / Acolhimento
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="tab_detalhe" class="aba-conteudo form-grid" style="display:none;">
       <label>Ofertado acolhimento 24h?</label>
-      <select id="acolhimento_24h">
+      <select id="acolhimento_24h" class="form-select">
         <option value="">Selecione</option>
         <option value="Sim">Sim</option>
         <option value="Nao">Nao</option>
       </select>
 
       <label>Paciente aceitou?</label>
-      <select id="paciente_aceitou">
+      <select id="paciente_aceitou" class="form-select">
         <option value="">Selecione</option>
         <option value="Sim">Sim</option>
         <option value="Nao">Nao</option>
         <option value="Nao se aplica">Nao se aplica</option>
       </select>
 
-      <label>Observacoes:</label>
-      <textarea id="observacoes_atendimento" rows="4" maxlength="1000"></textarea>
+      <label>Observações:</label>
+      <textarea id="observacoes_atendimento" rows="3" maxlength="1000" class="form-control"></textarea>
+    </div>
 
-      <br><br>
-
-      <button type="button" id="btnSalvarAtendimento" onclick="salvarAtendimento()">
+    <div class="mt-3">
+      <button type="button" id="btnSalvarAtendimento" class="btn btn-primary w-100" onclick="salvarAtendimento()">
         Salvar Atendimento
       </button>
     </div>
