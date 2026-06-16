@@ -11,33 +11,93 @@
     {% if erro %}
     <p style="color:red;">{{ erro }}</p>
     {% endif %}
+    
     <form action="/cadastrar_usuario" method="post">
-        <input type="text" name="cnes" placeholder="CNES de sua Unidade" required><br><br>
-        <input type="text" name="name" placeholder="Nome do servidor" required><br><br>
-        <select name="cbo" id="" placeholder="Escolha sua profissão conforme seu CBO" required>
-            <option value="411010">Assistente em Administração</option>
-            <option value="251605">Assistente Social</option>
-            <option value="322230">Auxiliar em Enfermagem</option>
-            <option value="223405">Farmacêutico</option>
-            <option value="223505">Enfermeiro</option>
-            <option value="224140">Profissional de Educação Física</option>
-            <option value="251510">Psicólogo Clínico</option>
-            <option value="223905">Terapeuta Ocupacional</option>
-            <option value="322205">Técnico em Enfermagem</option>
-            <option value="225125">Médico Clínico</option>
-            <option value="225133">Médico Psiquiatra</option>
-            <option value="223710">Nutricionista</option>
-        </select><br><br>
-        <input type="text" name="cpf" placeholder="CPF" required><br><br>
+        
+        <input type="text" name="cpf" id="cpf" placeholder="Digite seu CPF" required><br>
+        <span id="cpf-status" style="font-size: 12px; display: block; margin-top: 5px;"></span><br>
+
+        <input type="text" name="name" id="nome_servidor" placeholder="Nome do servidor (Preenchido pelo CPF)" readonly style="background-color: #e9e9e9; cursor: not-allowed;" required><br><br>
+        
+        <input type="text" name="cbo" id="cbo_servidor" placeholder="CBO do servidor (Preenchido pelo CPF)" readonly style="background-color: #e9e9e9; cursor: not-allowed;" required><br><br>
+        
         <input type="email" name="email" placeholder="E-mail" required><br><br>
         <input type="password" name="senha" placeholder="Senha" required><br><br>
         <input type="password" name="confirmar_senha" placeholder="Confirmar Senha" required><br><br>
 
-        <button type="submit">Cadastrar</button>
+        <button type="submit" id="btn-cadastrar">Cadastrar</button>
     </form>
 
     <br>
     <a href="/">Voltar para login</a>
+
+    <script>
+    // 1. MÁSCARA AUTOMÁTICA: Formata o CPF visualmente enquanto o usuário digita
+    document.getElementById('cpf').addEventListener('input', function(e) {
+        let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+        
+        // Limita a 11 dígitos para evitar quebras
+        if (valor.length > 11) {
+            valor = valor.slice(0, 11);
+        }
+
+        // Aplica a formatação dinamicamente conforme o tamanho do texto
+        if (valor.length > 9) {
+            valor = valor.replace(/^(\d{3})(\d{3})(\d{3})(\d{1,2})$/, "$1.$2.$3-$4");
+        } else if (valor.length > 6) {
+            valor = valor.replace(/^(\d{3})(\d{3})(\d{1,3})$/, "$1.$2.$3");
+        } else if (valor.length > 3) {
+            valor = valor.replace(/^(\d{3})(\d{1,3})$/, "$1.$2");
+        }
+
+        e.target.value = valor; // Atualiza o valor do input na tela
+        });
+
+        // 2. VALIDAÇÃO: Dispara quando o usuário clica fora do campo (evento blur)
+        document.getElementById('cpf').addEventListener('blur', function() {
+            // Mantemos essa constante IGUAL: ela limpa a máscara para a API receber só números (11 dígitos)
+            const cpf = this.value.replace(/\D/g, ''); 
+            
+            const statusSpan = document.getElementById('cpf-status');
+            const nomeInput = document.getElementById('nome_servidor');
+            const cboInput = document.getElementById('cbo_servidor');
+            const btnCadastrar = document.getElementById('btn-cadastrar');
+
+            if (cpf.length === 11) {
+                statusSpan.style.color = 'gray';
+                statusSpan.innerText = 'Verificando CPF na base do RH...';
+
+                fetch(`/api/verificar_cpf/${cpf}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('CPF não autorizado');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.existe) {
+                            statusSpan.style.color = 'green';
+                            statusSpan.innerText = '✓ Servidor autorizado para o sistema.';
+                            nomeInput.value = data.nome;
+                            cboInput.value = data.cbo;
+                            btnCadastrar.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        statusSpan.style.color = 'red';
+                        statusSpan.innerText = '✕ Este CPF não consta na base de servidores autorizados.';
+                        nomeInput.value = '';
+                        cboInput.value = '';
+                        btnCadastrar.disabled = true;
+                    });
+            } else {
+                statusSpan.style.color = 'orange';
+                statusSpan.innerText = 'Por favor, digite um CPF válido com 11 dígitos.';
+                nomeInput.value = '';
+                cboInput.value = '';
+            }
+        });
+    </script>
 
 </body>
 </html>

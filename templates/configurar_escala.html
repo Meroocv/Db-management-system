@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+
+<div style="margin-top: 70px;" class="container mt-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('servidores') }}">Visualizar Escalas</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Planejamento</li>
+                </ol>
+            </nav>
+            <div class="d-flex align-items-center gap-2">
+                <h2 class="m-0">Configurar Escala de:</h2>
+                <form method="GET" action="" class="d-flex gap-2 align-items-center m-0">
+                    <select name="mes" class="form-select form-select-lg fw-bold border-primary text-primary" onchange="this.form.submit()" style="width: 170px;">
+                        {% for num, nome_mes in meses_ano %}
+                            <option value="{{ num }}" {% if num == mes_config %}selected{% endif %}>{{ nome_mes }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="ano" class="form-select form-select-lg fw-bold border-primary text-primary" onchange="this.form.submit()" style="width: 110px;">
+                        <option value="{{ ano_config }}" selected>{{ ano_config }}</option>
+                        <option value="{{ ano_config + 1 }}">{{ ano_config + 1 }}</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('servidores') }}" class="btn btn-outline-secondary">Voltar</a>
+            <button type="submit" form="form-escala" class="btn btn-success d-flex align-items-center gap-2">
+                Salvar Escala
+            </button>
+        </div>
+    </div>
+
+    <form id="form-escala" method="POST" action="">
+        <input type="hidden" name="mes" value="{{ mes_config }}">
+        <input type="hidden" name="ano" value="{{ ano_config }}">
+
+        <div class="table-responsive shadow-sm border rounded">
+            <table class="table table-bordered table-hover align-middle m-0" style="min-width: 1300px;">
+                <thead class="table-dark text-center">
+                    <tr>
+                        <th style="min-width: 240px; position: sticky; left: 0; background-color: #212529; z-index: 3;">Servidores</th>
+                        {% for dia in lista_dias %}
+                        <th style="min-width: 65px; width: 65px;">{{ dia.numero }}<br><small style="font-size: 0.7rem; color: #adb5bd;">{{ dia.nome_semana }}</small></th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cargo, servidores in escala_por_cargo.items() %}
+                        {% for servidor in servidores %}
+                        <tr data-servidor-id="{{ servidor.id }}">
+                            <td style="position: sticky; left: 0; background-color: var(--bs-table-bg); z-index: 1;">
+                                <div class="fw-bold">{{ servidor.nome }}</div>
+                                <div class="mt-1">
+                                    <select name="regime_{{ servidor.id }}" class="form-select form-select-sm py-0 text-muted border-secondary js-select-regime" style="font-size: 0.75rem;">
+                                        <option value="plantonista" {% if servidor.regime == 'plantonista' %}selected{% endif %}>Plantonista</option>
+                                        <option value="diarista_40h" {% if servidor.regime == 'diarista_40h' %}selected{% endif %}>Diarista (40h - Seg a Sex)</option>
+                                    </select>
+                                </div>
+                            </td>
+                            
+                            {% for dia in lista_dias %}
+                            <td class="p-1 text-center {% if not dia.is_util %}bg-light text-muted{% endif %}">
+                                
+                                {% set turno_salvado = servidor.turnos_existentes.get(dia.numero) %}
+                                
+                                {% set valor_padrao = '-' %}
+                                {% if turno_salvado %}
+                                    {% set valor_padrao = turno_salvado %}
+                                {% elif servidor.regime == 'diarista_40h' and dia.is_util %}
+                                    {% set valor_padrao = 'MT' %}
+                                {% endif %}
+
+                                <select name="turno_{{ servidor.id }}_{{ dia.numero }}" 
+                                        class="form-select form-select-sm p-1 text-center border-0 bg-transparent fw-bold js-select-turno" 
+                                        data-is-util="{{ 'true' if dia.is_util else 'false' }}"
+                                        style="font-size: 0.8rem;">
+                                    <option value="-" {% if valor_padrao == '-' %}selected{% endif %}>-</option>
+                                    <option value="M" {% if valor_padrao == 'M' %}selected{% endif %}>M</option>
+                                    <option value="T" {% if valor_padrao == 'T' %}selected{% endif %}>T</option>
+                                    <option value="N" {% if valor_padrao == 'N' %}selected{% endif %}>N</option>
+                                    <option value="MT" {% if valor_padrao == 'MT' %}selected{% endif %}>MT</option>
+                                    <option value="F" {% if valor_padrao == 'F' %}selected{% endif %}>F</option>
+                                </select>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+document.querySelectorAll('.js-select-regime').forEach(selectRegime => {
+    selectRegime.addEventListener('change', function() {
+        const tr = this.closest('tr');
+        const regimeEscolhido = this.value;
+        const selectsTurno = tr.querySelectorAll('.js-select-turno');
+
+        selectsTurno.forEach(selectTurno => {
+            const isUtil = selectTurno.getAttribute('data-is-util') === 'true';
+            
+            if (regimeEscolhido === 'diarista_40h') {
+                if (isUtil) {
+                    selectTurno.value = 'MT';
+                } else {
+                    selectTurno.value = '-';
+                }
+            } else {
+                // Se mudar de volta para plantonista, limpa deixando tudo em branco
+                selectTurno.value = '-';
+            }
+        });
+    });
+});
+</script>
+
+{% endblock %}  

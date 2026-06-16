@@ -1,10 +1,13 @@
 import os
 import re
+import calendar
 from datetime import datetime, timedelta
 
-from flask import Flask, jsonify, redirect, render_template, request, session, send_file
+from flask import Flask, jsonify, redirect, render_template, request, session, send_file, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
+from flask_mail import Mail, Message  # ADICIONADO
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature  # ADICIONADO
 from sqlalchemy import func, case, and_
 from wtforms import StringField, SubmitField
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -22,7 +25,17 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# CONFIGURAÇÕES DO SERVIDOR DE E-MAIL (SMTP)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'seu_email_oficial@gmail.com'  # Altere para o seu e-mail
+app.config['MAIL_PASSWORD'] = 'sua_senha_de_app_aqui'       # Altere para sua senha de aplicativo
+app.config['MAIL_DEFAULT_SENDER'] = ('Sistema de Escalas', 'seu_email_oficial@gmail.com')
+
 db = SQLAlchemy(app)
+mail = Mail(app)  # Inicializa o gerenciador de e-mails
+ts = URLSafeTimedSerializer(app.secret_key)  # Inicializa o gerador de tokens seguros
 
 # ==========================================
 # MODELOS ALCHEMY (TABELAS)
@@ -64,7 +77,6 @@ class Paciente(db.Model):
     data_admissao = db.Column(db.String(10))
     data_conclusao = db.Column(db.String(10))
     
-    # Campos adicionais identificados nas rotas de atualização
     tipo = db.Column(db.String(50))
     ddd = db.Column(db.String(5))
     telefone = db.Column(db.String(20))
@@ -84,21 +96,34 @@ class TelefonePaciente(db.Model):
     prontuario_paciente = db.Column(db.String(50), db.ForeignKey('pacientes.prontuario', ondelete='CASCADE'), nullable=False)
     ddd = db.Column(db.String(2), nullable=False)
     numero = db.Column(db.String(15), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False) # 'Paciente' ou 'Familiar'
+    tipo = db.Column(db.String(20), nullable=False) 
     nome_familiar = db.Column(db.String(100), nullable=True)
     parentesco_familiar = db.Column(db.String(50), nullable=True)
 
+# NOVA TABELA: Carga e dados oficiais pré-existentes dos Servidores
+class BaseServidores(db.Model):
+    __tablename__ = 'base_servidores'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cpf = db.Column(db.String(14), unique=True, nullable=False, index=True)
+    nome = db.Column(db.String(100), nullable=False)
+    cbo = db.Column(db.String(20), nullable=False)
+
+# MODIFICADO: Tabela de Servidores ativos com coluna "confirmado" integrada
 class Servidor(db.Model):
     __tablename__ = 'servidores'
 
     id = db.Column(db.Integer, primary_key=True)
     cnes = db.Column(db.String(20), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)  
     cbo = db.Column(db.String(20), nullable=False)
     cpf = db.Column(db.String(14), unique=True, nullable=False)
     email = db.Column(db.String(100), nullable=False)
     senha = db.Column(db.String(255), nullable=False)
     foto_perfil = db.Column(db.String(255))
+    regime = db.Column(db.String(20), default="plantonista") 
+    confirmado = db.Column(db.Boolean, default=False, nullable=False)  # NOVO CAMPO
+    
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
@@ -145,26 +170,26 @@ class PactuacaoGrupo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
-    tipo = db.Column(db.String(50)) # 'Grupo Terapeutico' ou 'Acolhimento Diurno'
+    tipo = db.Column(db.String(50)) 
     data_inicio = db.Column(db.String(10))
     data_fim = db.Column(db.String(10))
-    dias_semana = db.Column(db.String(100)) # Guardará "Seg,Ter" ou None
+    dias_semana = db.Column(db.String(100)) 
 
 
-# 1. Tabela para controlar quais CBOs têm direito a agenda
-class ConfigCbo(db.Model):
+class Escala(db.Model):
+    __tablename__ = 'escalas'
+
     id = db.Column(db.Integer, primary_key=True)
-    cbo_codigo = db.Column(db.String(10), unique=True, nullable=False)
-    nome_cbo = db.Column(db.String(100), nullable=False)
-    agenda_ativa = db.Column(db.Boolean, default=True)
+    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
+    dia = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.Integer, nullable=False)
+    ano = db.Column(db.Integer, nullable=False)
+    turno = db.Column(db.String(5), nullable=False)
 
-# 2. Tabela para bloquear dias por profissional
-class Afastamento(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    profissional = db.Column(db.String(100), nullable=False) # Nome ou ID do profissional
-    data_inicio = db.Column(db.String(10), nullable=False)   # Formato YYYY-MM-DD
-    data_fim = db.Column(db.String(10), nullable=False)      # Formato YYYY-MM-DD
-    motivo = db.Column(db.String(100), nullable=False)       # Férias, Licença Médica, etc.
+
+with app.app_context():
+    db.create_all()
+
 
 # ==========================================
 # CONFIGURAÇÕES E AUXILIARES
@@ -192,7 +217,7 @@ def foto_permitida(nome_arquivo):
 def servidor_logado():
     if 'usuario_id' not in session:
         return None
-    return Servidor.query.get(session['usuario_id'])
+    return db.session.get(Servidor, session['usuario_id'])
 
 def pode_aprovar_rh():
     return session.get('usuario_cbo') == '411010'
@@ -206,6 +231,24 @@ def contexto_usuario():
         'cbo_opcoes': CBO_OPCOES,
         'pode_aprovar_rh': pode_aprovar_rh(),
     }
+
+# NOVA FUNÇÃO AUXILIAR: Envio do token por e-mail
+def enviar_email_confirmacao(usuario_email, usuario_nome):
+    token = ts.dumps(usuario_email, salt='confirmacao-email-sal')
+    link_confirmacao = url_for('confirmar_email', token=token, _external=True)
+    
+    corpo_email = f"""Olá, {usuario_nome}!
+
+Sua conta no Sistema de Escalas foi pré-cadastrada.
+Para ativar seu acesso e utilizar o sistema, clique no link abaixo:
+
+{link_confirmacao}
+
+Este link é válido por 24 horas."""
+    
+    mensagem = Message("Confirmação de Cadastro - Sistema de Escalas", recipients=[usuario_email])
+    mensagem.body = corpo_email
+    mail.send(mensagem)
 
 
 # ==========================================
@@ -225,8 +268,12 @@ def logar():
     usuario = Servidor.query.filter_by(cpf=user).first()
 
     if usuario and check_password_hash(usuario.senha, senha):
+        # MODIFICADO: Bloqueia o login caso a conta não tenha sido confirmada pelo e-mail
+        if not usuario.confirmado:
+            return render_template('login.html', erro="Sua conta ainda não foi ativada. Verifique seu e-mail para confirmar o cadastro.")
+
         session['usuario_id'] = usuario.id
-        session['usuario'] = usuario.name
+        session['usuario'] = usuario.nome
         session['usuario_cbo'] = usuario.cbo
         session['usuario_foto'] = usuario.foto_perfil
         return redirect('/dashboard')
@@ -242,7 +289,7 @@ def dashboard():
     solicitacoes_pendentes = []
     if pode_aprovar_rh():
         solicitacoes_pendentes = db.session.query(
-            SolicitacaoCBO.id, Servidor.name, Servidor.cpf,
+            SolicitacaoCBO.id, Servidor.nome, Servidor.cpf,
             SolicitacaoCBO.cbo_atual, SolicitacaoCBO.cbo_solicitado, SolicitacaoCBO.criado_em
         ).join(Servidor, Servidor.id == SolicitacaoCBO.servidor_id)\
          .filter(SolicitacaoCBO.status == 'pendente')\
@@ -258,39 +305,25 @@ def pacientes():
     if 'usuario' not in session:
         return redirect('/')
     
-    # 1. Captura os parâmetros do filtro dinâmico enviados pelo formulário HTML
     tipo_busca = request.args.get('tipo_busca')
     termo = request.args.get('termo', '').strip()
     
-    # Iniciamos a query base
     query = Paciente.query
     
-    # 2. Se houver um termo digitado, aplica o filtro na coluna selecionada
     if termo:
         if tipo_busca == 'nome_paciente':
-            # Busca por partes do nome (LIKE), ignorando maiúsculas e minúsculas
             query = query.filter(Paciente.nome_paciente.ilike(f"%{termo}%"))
         elif tipo_busca == 'prontuario':
-            # Busca pelo início ou valor exato do prontuário
             query = query.filter(Paciente.prontuario.like(f"%{termo}%"))
         elif tipo_busca == 'cpf':
-            # Busca por partes do CPF
             query = query.filter(Paciente.cpf.like(f"%{termo}%"))
-
         elif tipo_busca == 'raca_cor':
-            # Busca por partes da raça/cor
             query = query.filter(Paciente.raca_cor.ilike(f"%{termo}%"))
 
-    if query is None:
-        return render_template('pacientes.html', **contexto_usuario(), pacientes=["Nenhum paciente encontrado."])
-            
-    # Executa a query filtrada ou traz todos (.all()) se o filtro estiver vazio
     lista_pacientes = query.all()
     
-    # 3. Monta o contexto padrão do sistema (dados do usuário logado, foto, etc.)
     contexto = contexto_usuario()
     contexto['pacientes'] = lista_pacientes
-    
     return render_template('pacientes.html', **contexto)
 
 
@@ -306,13 +339,10 @@ def novo_paciente():
 
     try:
         novo = Paciente()
-        
-        # Preenche os campos vindos do front-end (exceto chaves/relacionamentos)
         for campo, valor in dados.items():
             if hasattr(novo, campo) and campo not in ['prontuario', 'telefones']:
                 setattr(novo, campo, valor)
 
-        # Lógica de geração do prontuário
         if not dados.get('prontuario'):
             ultimo_paciente = db.session.query(Paciente.prontuario)\
                 .order_by(func.cast(Paciente.prontuario, db.Integer).desc())\
@@ -328,7 +358,6 @@ def novo_paciente():
 
         db.session.add(novo)
 
-        # 🌟 SALVA MULTIPLOS TELEFONES
         telefones_recebidos = dados.get('telefones', [])
         for tel in telefones_recebidos:
             novo_tel = TelefonePaciente(
@@ -342,7 +371,6 @@ def novo_paciente():
             db.session.add(novo_tel)
 
         db.session.commit()
-        
         return jsonify({
             "mensagem": "Paciente e telefones cadastrados com sucesso!",
             "prontuario": novo.prontuario
@@ -350,7 +378,6 @@ def novo_paciente():
 
     except Exception as e:
         db.session.rollback()
-        print(f"\n=== ERRO EM NOVO_PACIENTE: {str(e)} ===\n")
         return jsonify({"erro": f"Erro interno ao salvar no banco: {str(e)}"}), 500
     
 
@@ -359,9 +386,17 @@ def cadastro():
     return render_template('cadastro.html', cbo_opcoes=CBO_OPCOES)
 
 
+# NOVA ROTA: Retorna o nome do servidor caso exista na base_servidores (usado para o Ajax no Front-End)
+@app.route('/api/verificar_cpf/<cpf>')
+def verificar_cpf(cpf):
+    servidor_base = BaseServidores.query.filter_by(cpf=cpf).first()
+    if servidor_base:
+        return jsonify({"existe": True, "nome": servidor_base.nome})
+    return jsonify({"existe": False}), 404
+
+
 @app.route('/cadastrar_usuario', methods=['POST'])
 def cadastrar_usuario():
-    name = request.form.get('name')
     cpf = request.form.get('cpf')
     email = request.form.get('email')
     senha = request.form.get('senha')
@@ -369,6 +404,7 @@ def cadastrar_usuario():
     cnes = request.form.get('cnes')
     cbo = request.form.get('cbo')
 
+    # Validações padrões do formulário
     if not cbo:
         return render_template('cadastro.html', erro="CBO e obrigatorio", cbo_opcoes=CBO_OPCOES)
     if senha != confirmar:
@@ -378,28 +414,61 @@ def cadastrar_usuario():
     if not re.search(r'[A-Z]', senha) or not re.search(r'[a-z]', senha) or not re.search(r'[0-9]', senha):
         return render_template('cadastro.html', erro="Senha requer letra maiúscula, minúscula e número", cbo_opcoes=CBO_OPCOES)
 
+    # MODIFICADO 1: Verifica se o CPF está cadastrado na base de dados estática do RH
+    servidor_oficial = BaseServidores.query.filter_by(cpf=cpf).first()
+    if not servidor_oficial:
+        return render_template('cadastro.html', erro="Este CPF não consta na base de dados de servidores autorizados.", cbo_opcoes=CBO_OPCOES)
+
+    # MODIFICADO 2: Verifica se o servidor já criou um cadastro ativo/pendente
     if Servidor.query.filter_by(cpf=cpf).first():
-        return render_template('cadastro.html', erro="CPF ja cadastrado", cbo_opcoes=CBO_OPCOES)
+        return render_template('cadastro.html', erro="Este servidor já possui um cadastro ativo no sistema.", cbo_opcoes=CBO_OPCOES)
 
     senha_hash = generate_password_hash(senha)
-    novo_servidor = Servidor(name=name, cpf=cpf, email=email, senha=senha_hash, cnes=cnes, cbo=cbo)
+    
+    # MODIFICADO 3: Cria o servidor pegando o nome AUTOMATICAMENTE da tabela BaseServidores com confirmado=False
+    novo_servidor = Servidor(nome=servidor_oficial.nome, cpf=cpf, email=email, senha=senha_hash, cnes=cnes, cbo=cbo, confirmado=False)
     
     db.session.add(novo_servidor)
     db.session.commit()
-    return redirect('/')
+    
+    # MODIFICADO 4: Dispara o e-mail com token temporário seguro
+    try:
+        enviar_email_confirmacao(email, servidor_oficial.nome)
+        return render_template('login.html', mensagem_sucesso="Pré-cadastro concluído! Enviamos um link de ativação para o seu e-mail.")
+    except Exception as e:
+        return render_template('login.html', erro=f"Cadastro salvo, mas falhou o envio do e-mail de ativação: {e}. Contate o RH.")
+
+
+# NOVA ROTA: Trata o clique no link enviado para o e-mail do servidor
+@app.route('/confirmar/<token>')
+def confirmar_email(token):
+    try:
+        # Token expira em 24 horas (86400 segundos)
+        email = ts.loads(token, salt='confirmacao-email-sal', max_age=86400)
+    except SignatureExpired:
+        return render_template('login.html', erro="O link de confirmação expirou (mais de 24h).")
+    except BadTimeSignature:
+        return render_template('login.html', erro="Link de ativação inválido ou corrompido.")
+
+    servidor = Servidor.query.filter_by(email=email).first()
+    if servidor:
+        if servidor.confirmado:
+            return render_template('login.html', mensagem_sucesso="Esta conta já está ativada. Pode efetuar seu login.")
+        
+        servidor.confirmado = True
+        db.session.commit()
+        return render_template('login.html', mensagem_sucesso="E-mail verificado com sucesso! Conta ativa.")
+    
+    return render_template('login.html', erro="Usuário não encontrado.")
+
 
 @app.route('/paciente/<prontuario>/ficha_word')
 def gerar_ficha_word(prontuario):
     paciente = db.session.query(Paciente).filter_by(prontuario=prontuario).first()
-    
-    # Abre o seu modelo do Word
     doc = DocxTemplate("FICHA DE ACOLHIMENTO 5.docx")
-    
-    # Passa os dados do banco para dentro do arquivo
     context = { 'p': paciente }
     doc.render(context)
     
-    # Salva o arquivo na memória para enviar para o navegador
     file_stream = io.BytesIO()
     doc.save(file_stream)
     file_stream.seek(0)
@@ -418,7 +487,6 @@ def atendimentos():
 
     usuario_id = session.get('usuario_id')
     
-    # Define a regra condicional (CASE WHEN do SQL) usando SQLAlchemy expressions
     pode_editar_condicao = case(
         (and_(Atendimento.servidor_id == usuario_id, 
               Atendimento.created_at >= datetime.utcnow() - timedelta(days=10)), 1),
@@ -426,18 +494,10 @@ def atendimentos():
     )
 
     lista_atendimentos = db.session.query(
-        Atendimento.id,
-        Atendimento.prontuario,
-        Paciente.nome_paciente,
-        Atendimento.data_atendimento,
-        Atendimento.profissional,
-        Atendimento.procedimentos,
-        Atendimento.acolhimento_24h,
-        Atendimento.paciente_aceitou,
-        Atendimento.observacoes,
-        Atendimento.servidor_id,
-        pode_editar_condicao.label('pode_editar'),
-        Atendimento.created_at
+        Atendimento.id, Atendimento.prontuario, Paciente.nome_paciente,
+        Atendimento.data_atendimento, Atendimento.profissional, Atendimento.procedimentos,
+        Atendimento.acolhimento_24h, Atendimento.paciente_aceitou, Atendimento.observacoes,
+        Atendimento.servidor_id, pode_editar_condicao.label('pode_editar'), Atendimento.created_at
     ).join(Paciente, Paciente.prontuario == Atendimento.prontuario, isouter=True)\
      .order_by(Atendimento.data_atendimento.desc(), Atendimento.id.desc()).all()
 
@@ -459,17 +519,13 @@ def novo_atendimento():
         return jsonify({'erro': 'Dados não enviados corretamente'}), 400
 
     prontuario = dados.get('prontuario', '').strip()
-
     if not prontuario:
         return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
 
-    # Busca o paciente ignorando zeros à esquerda
     paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
-
     if not paciente:
         return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-    # 1. Salva o Atendimento Principal
     novo = Atendimento(
         prontuario=paciente.prontuario,
         data_atendimento=dados.get('data_atendimento'),
@@ -482,15 +538,14 @@ def novo_atendimento():
     )
     
     db.session.add(novo)
-    db.session.flush() # Gera o ID do 'novo' atendimento para usarmos logo abaixo
+    db.session.flush() 
 
-    # 2. Salva as Consultas Individuais Futuras (se houverem no JSON)
     datas_con = dados.get('data_proxima_consulta', [])
     horas_con = dados.get('hora_proxima_consulta', [])
     prof_con = dados.get('profissional_proxima_consulta', [])
 
     for i in range(len(datas_con)):
-        if datas_con[i]: # Só salva se a data foi preenchida
+        if datas_con[i]: 
             nova_con = ConsultaFutura(
                 atendimento_id=novo.id,
                 data=datas_con[i],
@@ -499,7 +554,6 @@ def novo_atendimento():
             )
             db.session.add(nova_con)
 
-    # 3. Salva as Pactuações de Grupos / Acolhimento Diurno
     tipos_pac = dados.get('tipo_pactuacao_periodo', [])
     dt_inicio_pac = dados.get('data_inicio_pactuacao', [])
     dt_fim_pac = dados.get('data_fim_pactuacao', [])
@@ -508,7 +562,6 @@ def novo_atendimento():
     for i in range(len(tipos_pac)):
         if tipos_pac[i]:
             tipo = tipos_pac[i]
-            # Se for Acolhimento Diurno, captura a string de dias (ex: "Ter,Qui")
             dias = dias_esp[i] if (tipo == 'Acolhimento Diurno' and i < len(dias_esp)) else None
             
             nova_pac = PactuacaoGrupo(
@@ -520,7 +573,7 @@ def novo_atendimento():
             )
             db.session.add(nova_pac)
 
-    db.session.commit() # Grava tudo permanentemente de uma vez só
+    db.session.commit() 
     return jsonify({'mensagem': 'Atendimento e pactuações cadastrados com sucesso!'})
 
 
@@ -536,14 +589,13 @@ def atualizar_atendimento():
     if not atendimento_id or not prontuario:
         return jsonify({'erro': 'Dados incompletos'}), 400
 
-    atendimento = Atendimento.query.get(atendimento_id)
+    atendimento = db.session.get(Atendimento, atendimento_id)
     if not atendimento:
         return jsonify({'erro': 'Atendimento nao encontrado'}), 404
 
     if atendimento.servidor_id != session.get('usuario_id'):
         return jsonify({'erro': 'Voce so pode editar atendimentos criados por voce'}), 403
 
-    # Verificação de prazo usando objetos datetime reais gerados pelo Alchemy
     if datetime.utcnow() - atendimento.created_at > timedelta(days=10):
         return jsonify({'erro': 'O prazo de 10 dias para editar este atendimento expirou'}), 403
 
@@ -559,7 +611,7 @@ def atualizar_atendimento():
     atendimento.observacoes = dados.get('observacoes')
 
     db.session.commit()
-    return jsonify({'mensagem': 'Atendimento atualizado com sucesso!'})
+    return jsonify({'mensagem': 'Atendimento updated!'})
 
 
 @app.route('/atualizar_perfil', methods=['POST'])
@@ -584,7 +636,7 @@ def atualizar_perfil():
         foto.save(caminho)
         servidor.foto_perfil = f"uploads/perfis/{nome_arquivo}"
 
-    servidor.name = nome
+    servidor.nome = nome
     servidor.email = email
     servidor.cnes = cnes
 
@@ -619,7 +671,7 @@ def aprovar_cbo(solicitacao_id):
 
     if solicitacao:
         if acao == 'aprovar':
-            servidor = Servidor.query.get(solicitacao.servidor_id)
+            servidor = db.session.get(Servidor, solicitacao.servidor_id)
             if servidor:
                 servidor.cbo = solicitacao.cbo_solicitado
             solicitacao.status = 'aprovada'
@@ -649,12 +701,10 @@ def atualizar_paciente():
         return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
     try:
-        # Atualiza dados nativos do paciente
         for campo, valor in dados.items():
             if hasattr(paciente, campo) and campo not in ['prontuario', 'telefones']:
                 setattr(paciente, campo, valor)
 
-        # 🌟 ATUALIZAÇÃO DOS TELEFONES (Delete antigo e insere novo fluxo)
         TelefonePaciente.query.filter_by(prontuario_paciente=prontuario).delete()
 
         telefones_recebidos = dados.get('telefones', [])
@@ -674,13 +724,11 @@ def atualizar_paciente():
 
     except Exception as e:
         db.session.rollback()
-        print(f"\n=== ERRO EM ATUALIZAR_PACIENTE: {str(e)} ===\n")
         return jsonify({"erro": f"Erro ao atualizar: {str(e)}"}), 500
     
 @app.route('/buscar_paciente')
 def buscar_paciente():
     prontuario = request.args.get('prontuario', '').strip()
-    
     paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
 
     if paciente:
@@ -696,7 +744,6 @@ def agendas():
     if 'usuario' not in session:
         return redirect('/')
 
-    # Exemplo de dados de agenda (substitua com consulta real ao banco)
     agendas = [
         {"data": "2024-07-01", "hora": "10:00", "profissional": "Dr. Silva", "tipo": "Consulta"},
         {"data": "2024-07-02", "hora": "14:00", "profissional": "Dra. Souza", "tipo": "Acolhimento Diurno"},
@@ -706,75 +753,154 @@ def agendas():
     contexto['agendas'] = agendas
     return render_template('agendas.html', **contexto)
 
-@app.route('/configurar_agenda')
-def tela_configurar_agenda():
+@app.route('/servidores')
+def servidores():
     if 'usuario' not in session:
         return redirect('/')
+
+    agora = datetime.now()
+    ano = request.args.get('ano', agora.year, type=int)
+    mes = request.args.get('mes', agora.month, type=int)
+    
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    dias_da_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    
+    lista_dias = []
+    for dia in range(1, ultimo_dia + 1):
+        dia_semana_num = datetime(ano, mes, dia).weekday()
+        lista_dias.append({
+            "numero": dia, 
+            "nome_semana": dias_da_semana[dia_semana_num],
+            "is_util": dia_semana_num < 5
+        })
         
-    # Puxa os CBOs que já estão ativos no banco
-    cbos_ativos_db = ConfigCbo.query.filter_by(agenda_ativa=True).all()
-    cbos_configurados_ativos = [c.cbo_codigo for c in cbos_ativos_db]
+    todos_servidores = Servidor.query.filter(Servidor.cbo.in_(CBO_OPCOES.keys())).all()
     
-    # Puxa todos os afastamentos agendados
-    afastamentos = Afastamento.query.all()
+    turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
+    mapa_escala = {(t.servidor_id, t.dia): t.turno for t in turnos_salvos}
 
-    contexto = contexto_usuario() # Mantém seu contexto da Opção A
-    return render_template(
-        'configurar_agenda.html', 
-        afastamentos=afastamentos, 
-        cbos_configurados_ativos=cbos_configurados_ativos,
-        **contexto
-    )
-
-@app.route('/salvar_config_cbo', methods=['POST'])
-def salvar_config_cbo():
-    # Pega a lista de CBOs marcados no formulário
-    cbos_marcados = request.form.getlist('cbos_ativos')
-    
-    # Reseta todos para inativos primeiro
-    ConfigCbo.query.update({ConfigCbo.agenda_ativa: False})
-    
-    # Atualiza ou insere os marcados como ativos
-    for cbo_cod in cbos_marcados:
-        cbo_nome = CBO_OPCOES.get(cbo_cod, "Especialidade")
-        config = ConfigCbo.query.filter_by(cbo_codigo=cbo_cod).first()
-        if config:
-            config.agenda_ativa = True
-        else:
-            nova_config = ConfigCbo(cbo_codigo=cbo_cod, nome_cbo=cbo_nome, agenda_ativa=True)
-            db.session.add(nova_config)
+    escala_por_cargo = {}
+    for s in todos_servidores:
+        nome_aba = CBO_OPCOES.get(s.cbo, "outros")
+        if nome_aba not in escala_por_cargo:
+            escala_por_cargo[nome_aba] = []
             
-    db.session.commit()
-    return redirect('/configurar_agenda')
+        turnos_mes = []
+        for d in lista_dias:
+            turno_dia = mapa_escala.get((s.id, d['numero']))
+            
+            if turno_dia is None:
+                if s.regime == 'diarista_40h' and d['is_util']:
+                    turno_dia = 'MT'
+                else:
+                    turno_dia = '-'
+                    
+            turnos_mes.append(turno_dia)
 
-@app.route('/salvar_afastamento', methods=['POST'])
-def salvar_afastamento():
-    novo_afas = Afastamento(
-        profissional=request.form.get('profissional'),
-        data_inicio=request.form.get('data_inicio'),
-        data_fim=request.form.get('data_fim'),
-        motivo=request.form.get('motivo')
-    )
-    db.session.add(novo_afas)
-    db.session.commit()
-    return redirect('/configurar_agenda')
+        escala_por_cargo[nome_aba].append({
+            "id": s.id,
+            "nome": s.nome,  
+            "turnos": turnos_mes 
+        })
+        
+    meses_ano = [
+        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
+        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
+    ]
 
-@app.route('/deletar_afastamento/<int:id>')
-def deletar_afastamento(id):
-    afas = Afastamento.query.get(id)
-    if afas:
-        db.session.delete(afas)
+    contexto = contexto_usuario()
+    contexto.update({
+        'escala_por_cargo': escala_por_cargo,
+        'lista_dias': lista_dias,
+        'mes_atual': mes,
+        'ano_atual': ano,
+        'meses_ano': meses_ano,
+        'cargo_usuario': session.get('usuario_cbo')
+    })
+    return render_template('servidores.html', **contexto)
+
+@app.route('/configurar-escala', methods=['GET', 'POST'])
+def configurar_escala():
+    if 'usuario' not in session or session.get('usuario_cbo') != '411010':
+        return redirect('/')
+
+    agora = datetime.now()
+    mes = request.args.get('mes', agora.month, type=int)
+    ano = request.args.get('ano', agora.year, type=int)
+
+    if request.method == 'POST':
+        dados = request.form
+        mes_salvar = int(dados.get('mes'))
+        ano_salvar = int(dados.get('ano'))
+
+        for chave, valor in dados.items():
+            if chave.startswith('regime_'):
+                servidor_id = int(chave.split('_')[1])
+                servidor = db.session.get(Servidor, servidor_id)
+                if servidor:
+                    servidor.regime = valor
+
+        for chave, valor in dados.items():
+            if chave.startswith('turno_'):
+                partes = chave.split('_')
+                servidor_id = int(partes[1])
+                dia_num = int(partes[2])
+
+                registro_existente = Escala.query.filter_by(
+                    servidor_id=servidor_id, dia=dia_num, mes=mes_salvar, ano=ano_salvar
+                ).first()
+
+                if registro_existente:
+                    registro_existente.turno = valor
+                else:
+                    novo_turn = Escala(
+                        servidor_id=servidor_id, dia=dia_num, mes=mes_salvar, ano=ano_salvar, turno=valor
+                    )
+                    db.session.add(novo_turn)
+
         db.session.commit()
-    return redirect('/configurar_agenda')
+        flash('Escala salva com sucesso!', 'success')
+        return redirect(url_for('servidores', mes=mes, ano=ano))
 
-# ==========================================
-# INICIALIZAÇÃO DA BASE DE DADOS
-# ==========================================
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    dias_da_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    
+    lista_dias = []
+    for dia in range(1, ultimo_dia + 1):
+        dia_semana_num = datetime(ano, mes, dia).weekday()
+        lista_dias.append({"numero": dia, "nome_semana": dias_da_semana[dia_semana_num], "is_util": dia_semana_num < 5})
 
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    todos_servidores = Servidor.query.filter(Servidor.cbo.in_(CBO_OPCOES.keys())).all()
+    turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
 
-with app.app_context():
-    db.create_all()
+    escala_por_cargo = {}
+    for s in todos_servidores:
+        nome_aba = CBO_OPCOES.get(s.cbo, "outros")
+        if nome_aba not in escala_por_cargo:
+            escala_por_cargo[nome_aba] = []
+            
+        servidor_dados = {
+            "id": s.id,
+            "nome": s.nome,  
+            "regime": s.regime,
+            "turnos_existentes": {t.dia: t.turno for t in turnos_salvos if t.servidor_id == s.id}
+        }
+        escala_por_cargo[nome_aba].append(servidor_dados)
+
+    meses_ano = [
+        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
+        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
+    ]
+
+    contexto = contexto_usuario()
+    contexto.update({
+        'escala_por_cargo': escala_por_cargo,
+        'lista_dias': lista_dias,
+        'mes_config': mes,
+        'ano_config': ano,
+        'meses_ano': meses_ano
+    })
+    return render_template('configurar_escala.html', **contexto)
 
 if __name__ == '__main__':
     app.run(debug=True)
