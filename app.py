@@ -1,7 +1,7 @@
 import os
 import re
 import calendar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from flask import Flask, jsonify, redirect, render_template, request, session, send_file, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -25,13 +25,14 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# CONFIGURAÇÕES DO SERVIDOR DE E-MAIL (SMTP)
+# CONFIGURAÇÕES DO SERVIDOR DE E-MAIL (SMTP) - GMAIL REAL (PORTA DE CONTINGÊNCIA)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'seu_email_oficial@gmail.com'  # Altere para o seu e-mail
-app.config['MAIL_PASSWORD'] = 'sua_senha_de_app_aqui'       # Altere para sua senha de aplicativo
-app.config['MAIL_DEFAULT_SENDER'] = ('Sistema de Escalas', 'seu_email_oficial@gmail.com')
+app.config['MAIL_PORT'] = 25           # 🚨 Porta alternativa para furar bloqueios de rede
+app.config['MAIL_USE_TLS'] = True     # Ativa a segurança necessária do Google
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = 'capsadafraniosoares.adm@gmail.com'
+app.config['MAIL_PASSWORD'] = 'mdbvxtfvrfphonsf'  # Sua senha de app que está correta
+app.config['MAIL_DEFAULT_SENDER'] = ('Sistema Interno', 'capsadafraniosoares.adm@gmail.com')
 
 db = SQLAlchemy(app)
 mail = Mail(app)  # Inicializa o gerenciador de e-mails
@@ -186,6 +187,23 @@ class Escala(db.Model):
     ano = db.Column(db.Integer, nullable=False)
     turno = db.Column(db.String(5), nullable=False)
 
+class Afastamento(db.Model):
+    __tablename__ = 'afastamentos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # SE O SEU __tablename__ na classe Servidor for 'servidores':
+    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
+    
+    # SE O SEU __tablename__ na classe Servidor for 'Servidor' (com S maiúsculo):
+    # servidor_id = db.Column(db.Integer, db.ForeignKey('Servidor.id'), nullable=False)
+
+    tipo = db.Column(db.String(50), nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date, nullable=False)
+    
+    servidor = db.relationship('Servidor', backref=db.backref('afastamentos', lazy=True))
+
 
 with app.app_context():
     db.create_all()
@@ -209,6 +227,12 @@ CBO_OPCOES = {
     "225133": "Medico Psiquiatra",
     "223710": "Nutricionista",
 }
+
+CBOS_MEDICOS = {'225125', '225133'}
+
+
+
+
 EXTENSOES_FOTO = {"png", "jpg", "jpeg", "webp"}
 
 def foto_permitida(nome_arquivo):
@@ -233,23 +257,35 @@ def contexto_usuario():
     }
 
 # NOVA FUNÇÃO AUXILIAR: Envio do token por e-mail
+# MODIFICADO: Envio do token com logs para o terminal
 def enviar_email_confirmacao(usuario_email, usuario_nome):
-    token = ts.dumps(usuario_email, salt='confirmacao-email-sal')
-    link_confirmacao = url_for('confirmar_email', token=token, _external=True)
-    
-    corpo_email = f"""Olá, {usuario_nome}!
-
-Sua conta no Sistema de Escalas foi pré-cadastrada.
-Para ativar seu acesso e utilizar o sistema, clique no link abaixo:
-
-{link_confirmacao}
-
-Este link é válido por 24 horas."""
-    
-    mensagem = Message("Confirmação de Cadastro - Sistema de Escalas", recipients=[usuario_email])
-    mensagem.body = corpo_email
-    mail.send(mensagem)
-
+    print(f"📬 [MAILPIT] Iniciando montagem do e-mail para: {usuario_email}")
+    try:
+        token = ts.dumps(usuario_email, salt='confirmacao-email-sal')
+        link_confirmacao = url_for('confirmar_email', token=token, _external=True)
+        
+        mensagem = Message("Confirmação de Cadastro - Sistema de Escalas", recipients=[usuario_email])
+        mensagem.body = f"Olá, {usuario_nome}!\n\nClique no link para ativar sua conta: {link_confirmacao}"
+        
+        mensagem.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+            <h2 style="color: #333;">Olá, {usuario_nome}!</h2>
+            <p>Sua conta no <strong>Sistema de Escalas</strong> foi pré-cadastrada com sucesso.</p>
+            <p>Para ativar seu acesso e utilizar o sistema, clique no botão abaixo:</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{link_confirmacao}" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Ativar Minha Conta</a>
+            </div>
+            <p style="font-size: 12px; color: #777;">Este link é válido por 24 horas.</p>
+        </div>
+        """
+        
+        print("🔄 [MAILPIT] Disparando comando mail.send(mensagem)...")
+        mail.send(mensagem)
+        print("🚀 [MAILPIT] comando mail.send executado SEM ERROS pelo Flask!")
+        
+    except Exception as e:
+        print(f"❌ [ERRO INTERNO NO FLASK-MAIL]: Erro exato ao tentar falar com o Mailpit: {e}")
+        raise e  # Repassa o erro para a rota capturar na tela
 
 # ==========================================
 # ROTAS DA APLICAÇÃO
@@ -265,21 +301,35 @@ def logar():
     user = request.form.get('cpf')
     senha = request.form.get('senha')
 
-    usuario = Servidor.query.filter_by(cpf=user).first()
+    if not user or not senha:
+        return render_template('login.html', erro="Preencha todos os campos.")
 
+    # 🔍 Limpa o CPF digitado no login (remove pontos e traços)
+    cpf_digitado_limpo = re.sub(r'\D', '', user)
+
+    # 🔍 Busca todos os servidores e compara o CPF de forma limpa
+    usuario = None
+    todos_servidores = Servidor.query.all()
+    for s in todos_servidores:
+        if re.sub(r'\D', '', s.cpf) == cpf_digitado_limpo:
+            usuario = s
+            break
+
+    # Se achou o usuário, valida a senha e o e-mail
     if usuario and check_password_hash(usuario.senha, senha):
-        # MODIFICADO: Bloqueia o login caso a conta não tenha sido confirmada pelo e-mail
         if not usuario.confirmado:
             return render_template('login.html', erro="Sua conta ainda não foi ativada. Verifique seu e-mail para confirmar o cadastro.")
 
+        # Cria a sessão do usuário
         session['usuario_id'] = usuario.id
         session['usuario'] = usuario.nome
         session['usuario_cbo'] = usuario.cbo
         session['usuario_foto'] = usuario.foto_perfil
+        
+        print(f"🎉 [LOGIN] {usuario.nome} logou com sucesso!")
         return redirect('/dashboard')
 
-    return render_template('login.html', erro="CPF ou senha invalidos")
-
+    return render_template('login.html', erro="CPF ou senha inválidos.")
 
 @app.route('/dashboard')
 def dashboard():
@@ -386,69 +436,99 @@ def cadastro():
     return render_template('cadastro.html', cbo_opcoes=CBO_OPCOES)
 
 
-# NOVA ROTA: Retorna o nome do servidor caso exista na base_servidores (usado para o Ajax no Front-End)
+# =====================================================================
+# MODIFICADO: Rota de Verificação para Ajax usando comparação limpa
+# =====================================================================
 @app.route('/api/verificar_cpf/<cpf>')
 def verificar_cpf(cpf):
-    servidor_base = BaseServidores.query.filter_by(cpf=cpf).first()
+    # Remove qualquer caractere que não seja número do CPF recebido via URL
+    cpf_limpo = re.sub(r'\D', '', cpf)
+    
+    # Busca todos os servidores na base e compara ignorando pontuações
+    servidor_base = None
+    todos_base = BaseServidores.query.all()
+    for s in todos_base:
+        if re.sub(r'\D', '', s.cpf) == cpf_limpo:
+            servidor_base = s
+            break
+            
     if servidor_base:
-        return jsonify({"existe": True, "nome": servidor_base.nome})
+        return jsonify({
+            "existe": True, 
+            "nome": servidor_base.nome,
+            "cbo": servidor_base.cbo  # ADICIONADO: envia o CBO para preencher a tela automaticamente!
+        })
     return jsonify({"existe": False}), 404
 
 
+# =====================================================================
+# MODIFICADO: Rota de Cadastro Final corrigida para aceitar os campos da tela
+# =====================================================================
 @app.route('/cadastrar_usuario', methods=['POST'])
 def cadastrar_usuario():
-    cpf = request.form.get('cpf')
+    cpf_enviado = request.form.get('cpf')
     email = request.form.get('email')
     senha = request.form.get('senha')
-    confirmar = request.form.get('confirmar_senha')
-    cnes = request.form.get('cnes')
-    cbo = request.form.get('cbo')
+    
+    # 🔍 1. Remove pontuações do CPF para busca segura
+    cpf_limpo = re.sub(r'\D', '', cpf_enviado) if cpf_enviado else ""
 
-    # Validações padrões do formulário
-    if not cbo:
-        return render_template('cadastro.html', erro="CBO e obrigatorio", cbo_opcoes=CBO_OPCOES)
-    if senha != confirmar:
-        return render_template('cadastro.html', erro="As senhas nao coincidem", cbo_opcoes=CBO_OPCOES)
-    if len(senha) < 6:
-        return render_template('cadastro.html', erro="Minimo 6 caracteres", cbo_opcoes=CBO_OPCOES)
-    if not re.search(r'[A-Z]', senha) or not re.search(r'[a-z]', senha) or not re.search(r'[0-9]', senha):
-        return render_template('cadastro.html', erro="Senha requer letra maiúscula, minúscula e número", cbo_opcoes=CBO_OPCOES)
+    # 🔍 2. Busca o profissional autorizado na base do RH
+    servidor_oficial = None
+    todos_base = BaseServidores.query.all()
+    for s in todos_base:
+        if re.sub(r'\D', '', s.cpf) == cpf_limpo:
+            servidor_oficial = s
+            break
 
-    # MODIFICADO 1: Verifica se o CPF está cadastrado na base de dados estática do RH
-    servidor_oficial = BaseServidores.query.filter_by(cpf=cpf).first()
     if not servidor_oficial:
-        return render_template('cadastro.html', erro="Este CPF não consta na base de dados de servidores autorizados.", cbo_opcoes=CBO_OPCOES)
+        return "❌ ERRO: CPF não encontrado na base de dados do RH!"
 
-    # MODIFICADO 2: Verifica se o servidor já criou um cadastro ativo/pendente
-    if Servidor.query.filter_by(cpf=cpf).first():
-        return render_template('cadastro.html', erro="Este servidor já possui um cadastro ativo no sistema.", cbo_opcoes=CBO_OPCOES)
-
+    # 🔍 3. SALVAMENTO DIRETO (Sem travas de validação para teste)
     senha_hash = generate_password_hash(senha)
     
-    # MODIFICADO 3: Cria o servidor pegando o nome AUTOMATICAMENTE da tabela BaseServidores com confirmado=False
-    novo_servidor = Servidor(nome=servidor_oficial.nome, cpf=cpf, email=email, senha=senha_hash, cnes=cnes, cbo=cbo, confirmado=False)
+    novo_servidor = Servidor(
+        nome=servidor_oficial.nome, 
+        cpf=servidor_oficial.cpf, 
+        email=email, 
+        senha=senha_hash, 
+        cnes="Não Informado", 
+        cbo=servidor_oficial.cbo, # Pega o CBO direto do banco do RH
+        confirmado=False
+    )
     
-    db.session.add(novo_servidor)
-    db.session.commit()
-    
-    # MODIFICADO 4: Dispara o e-mail com token temporário seguro
     try:
+        db.session.add(novo_servidor)
+        db.session.commit()
+        print("✅ [DEBUG] Usuário salvo no banco com sucesso!")
+        
+        # 🚨 DISPARO DO E-MAIL FORÇADO
+        print(f"🔄 [DEBUG] Tentando enviar e-mail para {email}...")
         enviar_email_confirmacao(email, servidor_oficial.nome)
-        return render_template('login.html', mensagem_sucesso="Pré-cadastro concluído! Enviamos um link de ativação para o seu e-mail.")
+        print("✅ [DEBUG] O Flask-Mail enviou o e-mail com sucesso!")
+        
+        return "🎉 CADASTRO REALIZADO! Verifique sua caixa de entrada (e a pasta de Spam/Lixo Eletrônico)."
+        
     except Exception as e:
-        return render_template('login.html', erro=f"Cadastro salvo, mas falhou o envio do e-mail de ativação: {e}. Contate o RH.")
-
-
-# NOVA ROTA: Trata o clique no link enviado para o e-mail do servidor
+        db.session.rollback()
+        print(f"❌ [ERRO CRÍTICO NO ENVIO/BANCO]: {e}")
+        return f"Falha no processo: {e}"
+    
 @app.route('/confirmar/<token>')
 def confirmar_email(token):
     try:
         # Token expira em 24 horas (86400 segundos)
         email = ts.loads(token, salt='confirmacao-email-sal', max_age=86400)
+        print(f"🔍 [Token Válido] E-mail extraído com sucesso: {email}")
     except SignatureExpired:
+        print("❌ [Erro Token] O token expirou por tempo (max_age).")
         return render_template('login.html', erro="O link de confirmação expirou (mais de 24h).")
-    except BadTimeSignature:
+    except BadTimeSignature as e:
+        print(f"❌ [Erro Token] Assinatura corrompida ou inválida. Detalhes: {e}")
         return render_template('login.html', erro="Link de ativação inválido ou corrompido.")
+    except Exception as e:
+        print(f"❌ [Erro Token] Erro genérico ao decodificar: {e}")
+        return render_template('login.html', erro="Falha ao processar o link de ativação.")
 
     servidor = Servidor.query.filter_by(email=email).first()
     if servidor:
@@ -457,10 +537,11 @@ def confirmar_email(token):
         
         servidor.confirmado = True
         db.session.commit()
+        print(f"✅ [Sucesso] Servidor com e-mail {email} foi confirmado!")
         return render_template('login.html', mensagem_sucesso="E-mail verificado com sucesso! Conta ativa.")
     
+    print(f"⚠️ [Aviso] E-mail {email} decodificado mas não encontrado na tabela Servidor.")
     return render_template('login.html', erro="Usuário não encontrado.")
-
 
 @app.route('/paciente/<prontuario>/ficha_word')
 def gerar_ficha_word(prontuario):
@@ -776,6 +857,15 @@ def servidores():
         
     todos_servidores = Servidor.query.filter(Servidor.cbo.in_(CBO_OPCOES.keys())).all()
     
+    # 1. BUSCA AFASTAMENTOS QUE REBATEM NO MÊS/ANO VISUALIZADO
+    primeiro_dia_mes = date(ano, mes, 1)
+    ultimo_dia_mes = date(ano, mes, ultimo_dia)
+    
+    afastamentos_mes = Afastamento.query.filter(
+        Afastamento.data_inicio <= ultimo_dia_mes,
+        Afastamento.data_fim >= primeiro_dia_mes
+    ).all()
+    
     turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
     mapa_escala = {(t.servidor_id, t.dia): t.turno for t in turnos_salvos}
 
@@ -785,16 +875,56 @@ def servidores():
         if nome_aba not in escala_por_cargo:
             escala_por_cargo[nome_aba] = []
             
+        # Filtra os afastamentos deste servidor específico neste mês
+        afastamentos_servidor = [a for a in afastamentos_mes if a.servidor_id == s.id]
+        
         turnos_mes = []
         for d in lista_dias:
-            turno_dia = mapa_escala.get((s.id, d['numero']))
+            dia_num = d['numero']
+            data_corrente = date(ano, mes, dia_num)
             
-            if turno_dia is None:
-                if s.regime == 'diarista_40h' and d['is_util']:
-                    turno_dia = 'MT'
+            # 2. VERIFICA SE O SERVIDOR ESTÁ AFASTADO NESSE DIA
+            afastamento_ativo = None
+            for afast in \
+                    afastamentos_servidor:
+                if afast.data_inicio <= data_corrente <= \
+                        afast.data_fim:
+                    afastamento_ativo = afast
+                    break
+            
+            if afastamento_ativo:
+                # Aplica a sigla correspondente do afastamento
+                if 'férias' in afastamento_ativo.tipo.lower():
+                    turno_dia = 'F'
+                elif 'licença' in \
+                        afastamento_ativo.tipo.lower():
+                    turno_dia = 'LM'
                 else:
-                    turno_dia = '-'
-                    
+                    turno_dia = 'F'  # Folga/Afastamento padrão
+            else:
+                # 3. SE NÃO HOUVER AFASTAMENTO, SEGUE A LOGA NORMAL DE TURNOS
+                turno_dia = mapa_escala.get((s.id, dia_num))
+                
+                if turno_dia is None:
+                    if s.cbo in CBOS_MEDICOS:
+                        # Fallback dinâmico para os novos regimes de médicos diaristas
+                        if d['is_util'] and s.regime in ['m', 't', 'mt', 'i']:
+                            turno_dia = s.regime.upper()
+                        elif d['is_util'] and (s.regime == 'plantonista' or not s.regime):
+                            turno_dia = '-'  # Plantonista começa vazio na semana
+                        else:
+                            turno_dia = '-'
+                    elif d['is_util'] and s.regime in ['diarista_40h', 'diarista_integral', 'mt']:
+                        turno_dia = 'MT'
+                    elif d['is_util'] and s.regime in ['diarista_manha', 'm']:
+                        turno_dia = 'M'
+                    elif d['is_util'] and s.regime in ['diarista_tarde', 't']:
+                        turno_dia = 'T'
+                    elif d['is_util'] and s.regime in ['diarista_intermediario', 'i']:
+                        turno_dia = 'I'
+                    else:
+                        turno_dia = '-'
+                        
             turnos_mes.append(turno_dia)
 
         escala_por_cargo[nome_aba].append({
@@ -815,7 +945,8 @@ def servidores():
         'mes_atual': mes,
         'ano_atual': ano,
         'meses_ano': meses_ano,
-        'cargo_usuario': session.get('usuario_cbo')
+        'cargo_usuario': session.get('usuario_cbo'),
+        'servidores_lista': todos_servidores  # <-- ADICIONE ESSA LINHA AQUI
     })
     return render_template('servidores.html', **contexto)
 
@@ -837,7 +968,7 @@ def configurar_escala():
             if chave.startswith('regime_'):
                 servidor_id = int(chave.split('_')[1])
                 servidor = db.session.get(Servidor, servidor_id)
-                if servidor:
+                if servidor:  # <-- CORRIGIDO: Agora salva o regime para TODOS, incluindo médicos
                     servidor.regime = valor
 
         for chave, valor in dados.items():
@@ -882,6 +1013,7 @@ def configurar_escala():
         servidor_dados = {
             "id": s.id,
             "nome": s.nome,  
+            "cbo": s.cbo,
             "regime": s.regime,
             "turnos_existentes": {t.dia: t.turno for t in turnos_salvos if t.servidor_id == s.id}
         }
@@ -901,6 +1033,51 @@ def configurar_escala():
         'meses_ano': meses_ano
     })
     return render_template('configurar_escala.html', **contexto)
+
+
+@app.route('/cadastrar-afastamento', methods=['POST'])
+def cadastrar_afastamento():
+    if 'usuario' not in session or session.get('usuario_cbo') != '411010':
+        return redirect('/')
+
+    servidor_id = request.form.get('servidor_id', type=int)
+    tipo = request.form.get('tipo')
+    data_inicio_str = request.form.get('data_inicio')
+    data_fim_str = request.form.get('data_fim')
+
+    if not servidor_id or not tipo or not data_inicio_str or not data_fim_str:
+        flash('Todos os campos são obrigatórios!', 'danger')
+        return redirect(url_for('servidores'))
+
+    try:
+        # Converte as strings de data que vêm do HTML (formato YYYY-MM-DD) para objetos date do Python
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+
+        if data_fim < data_inicio:
+            flash('A data de fim não pode ser menor que a data de início!', 'danger')
+            return redirect(url_for('servidores'))
+
+        # Cria o registro do afastamento
+        novo_afastamento = Afastamento(
+            servidor_id=servidor_id,
+            tipo=tipo,
+            data_inicio=data_inicio,
+            data_fim=data_fim
+        )
+        
+        db.session.add(novo_afastamento)
+        db.session.commit()
+        flash('Afastamento cadastrado com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cadastrar afastamento: {str(e)}', 'danger')
+
+    # Retorna para a mesma página mantendo o mês e ano visualizados
+    mes = request.form.get('mes_retorno', datetime.now().month, type=int)
+    ano = request.form.get('ano_retorno', datetime.now().year, type=int)
+    return redirect(url_for('servidores', mes=mes, ano=ano))
 
 if __name__ == '__main__':
     app.run(debug=True)

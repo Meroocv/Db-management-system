@@ -18,23 +18,25 @@
     <ul class="nav nav-tabs mb-4" id="escalaTabs" role="tablist">
         {% for cargo in escala_por_cargo.keys() %}
         <li class="nav-item" role="presentation">
+            {% set cargo_id = cargo|replace('é', 'e')|replace('í', 'i')|replace(' ', '_')|lower %}
             <button class="nav-link {% if loop.first %}active{% endif %} text-capitalize" 
-                    id="tab-{{ cargo }}" 
+                    id="tab-{{ cargo_id }}" 
                     data-bs-toggle="tab" 
-                    data-bs-target="#conteudo-{{ cargo }}" 
+                    data-bs-target="#conteudo-{{ cargo_id }}" 
                     type="button" 
                     role="tab">
-                {{ cargo }}
-            </button>
+                {{ cargo }} </button>
         </li>
         {% endfor %}
     </ul>
 
     <div class="tab-content" id="escalaTabsConteudo">
         {% for cargo, servidores in escala_por_cargo.items() %}
-        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="conteudo-{{ cargo }}" role="tabpanel">
+        {% set cargo_id = cargo|replace('é', 'e')|replace('í', 'i')|replace(' ', '_')|lower %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="conteudo-{{ cargo_id }}" role="tabpanel">
             
             <div class="table-responsive shadow-sm" style="max-height: 500px; overflow-y: auto;">
+                ```
                 <table class="table table-bordered table-striped align-middle" style="min-width: 1200px;">
                     <thead class="table-dark text-center" style="position: sticky; top: 0; z-index: 2;">
                         

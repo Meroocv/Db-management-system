@@ -54,7 +54,7 @@
         });
 
         // 2. VALIDAÇÃO: Dispara quando o usuário clica fora do campo (evento blur)
-        document.getElementById('cpf').addEventListener('blur', function() {
+        document.getElementById('cpf').addEventListener('input', function() {
             // Mantemos essa constante IGUAL: ela limpa a máscara para a API receber só números (11 dígitos)
             const cpf = this.value.replace(/\D/g, ''); 
             

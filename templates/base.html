@@ -45,10 +45,17 @@
             </li>
             
              <li class="nav-item">
-              <a class="nav-link {% if rota_atual == '/agendas' %}active{% endif %}" href="/agendas">
-                <img src="{{ url_for('static', filename='calendar_3661270.png') }}" alt="Agendas" class="nav-icon">
-                <span>Agendas</span>
-              </a>
+                <a class="nav-link {% if rota_atual == '/agendas' %}active{% endif %}" href="/agendas">
+                  <img src="{{ url_for('static', filename='calendar_3661270.png') }}" alt="Agendas" class="nav-icon">
+                  <span>Agendas</span>
+                </a>
+             </li>
+             <li>
+                <a class="nav-link {% if rota_atual == '/servidores' %}active{% endif %}" href="/servidores">
+                  <img src="{{ url_for('static', filename='servidores.png') }}" alt="Servidores" class="nav-icon">
+                  <span>Servidores </span>
+                </a>
+             </li>
             <li class="nav-item sidebar-logout">
               <a class="nav-link" href="/logout">
                 <img src="{{ url_for('static', filename='sair.png') }}" alt="Sair" class="nav-icon">
