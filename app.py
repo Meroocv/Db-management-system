@@ -950,6 +950,18 @@ def servidores():
     })
     return render_template('servidores.html', **contexto)
 
+@app.context_processor
+def injetar_servidores():
+    # Substitua pela forma como você busca os servidores no seu banco de dados
+    # Exemplo se usar SQLAlchemy: servidores = Servidor.query.all()
+    # Exemplo se usar banco normal: servidores = buscar_todos_servidores_do_banco()
+    
+    servidores = Servidor.query.order_by(Servidor.nome).all() 
+    
+    # O nome da chave aqui deve ser EXATAMENTE o que está no seu loop do modal
+    return dict(servidores_lista=servidores)
+
+
 @app.route('/configurar-escala', methods=['GET', 'POST'])
 def configurar_escala():
     if 'usuario' not in session or session.get('usuario_cbo') != '411010':
@@ -1024,12 +1036,15 @@ def configurar_escala():
         (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
     ]
 
+    afastamentos_lista = Afastamento.query.order_by(Afastamento.data_inicio.desc()).all()
+
     contexto = contexto_usuario()
     contexto.update({
         'escala_por_cargo': escala_por_cargo,
         'lista_dias': lista_dias,
         'mes_config': mes,
         'ano_config': ano,
+        'afastamentos_lista': afastamentos_lista,
         'meses_ano': meses_ano
     })
     return render_template('configurar_escala.html', **contexto)
@@ -1078,6 +1093,50 @@ def cadastrar_afastamento():
     mes = request.form.get('mes_retorno', datetime.now().month, type=int)
     ano = request.form.get('ano_retorno', datetime.now().year, type=int)
     return redirect(url_for('servidores', mes=mes, ano=ano))
+
+# 1. ROTA PARA AUTORIZAR O AFASTAMENTO
+@app.route('/autorizar_afastamento/<int:id>', methods=['POST'])
+def autorizar_afastamento(id):
+    afastamento = Afastamento.query.get_or_404(id)
+    afastamento.status = 'Autorizado'
+    
+    # [DICA]: Se você quiser que o "F" apareça automaticamente na tabela ao autorizar,
+    # você pode varrer os dias entre afastamento.data_inicio e data_fim aqui 
+    # e salvar o turno deles como 'F' no banco de dados.
+    
+    db.session.commit()
+    flash('Afastamento autorizado com sucesso!', 'success')
+    return redirect(request.referrer) # Volta para a página onde o gestor estava
+
+# 2. ROTA PARA EDITAR OS DIAS DO AFASTAMENTO
+@app.route('/editar_afastamento/<int:id>', methods=['POST'])
+def editar_afastamento(id):
+    afastamento = Afastamento.query.get_or_404(id)
+    
+    # Coleta as novas datas enviadas pelo modal de edição
+    data_inicio_str = request.form.get('data_inicio')
+    data_fim_str = request.form.get('data_fim')
+    
+    # Converte strings do input date para objetos date do Python
+    from datetime import datetime
+    afastamento.data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+    afastamento.data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+    
+    db.session.commit()
+    flash('Período de afastamento atualizado!', 'success')
+    return redirect(request.referrer)
+
+# 3. ROTA PARA CANCELAR / DELETAR O AFASTAMENTO
+@app.route('/cancelar_afastamento/<int:id>', methods=['POST'])
+def cancelar_afastamento(id):
+    afastamento = Afastamento.query.get_or_404(id)
+    
+    db.session.delete(afastamento)
+    db.session.commit()
+    
+    flash('Afastamento cancelado e removido do sistema.', 'warning')
+    return redirect(request.referrer)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
