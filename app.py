@@ -201,6 +201,7 @@ class Afastamento(db.Model):
     tipo = db.Column(db.String(50), nullable=False)
     data_inicio = db.Column(db.Date, nullable=False)
     data_fim = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default='Pendente')
     
     servidor = db.relationship('Servidor', backref=db.backref('afastamentos', lazy=True))
 
@@ -863,7 +864,8 @@ def servidores():
     
     afastamentos_mes = Afastamento.query.filter(
         Afastamento.data_inicio <= ultimo_dia_mes,
-        Afastamento.data_fim >= primeiro_dia_mes
+        Afastamento.data_fim >= primeiro_dia_mes,
+        Afastamento.status == 'Autorizado'
     ).all()
     
     turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
@@ -1078,7 +1080,8 @@ def cadastrar_afastamento():
             servidor_id=servidor_id,
             tipo=tipo,
             data_inicio=data_inicio,
-            data_fim=data_fim
+            data_fim=data_fim,
+            status='Pendente'
         )
         
         db.session.add(novo_afastamento)

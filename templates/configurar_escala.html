@@ -129,6 +129,12 @@
                                         {% set valor_padrao = turno_salvado %}
                                     {% elif servidor.regime == 'diarista_40h' and dia.is_util %}
                                         {% set valor_padrao = 'MT' %}
+                                    {% elif servidor.regime == 'diarista_manha' and dia.is_util %}
+                                        {% set valor_padrao = 'M' %}
+                                    {% elif servidor.regime == 'diarista_tarde' and dia.is_util %}
+                                        {% set valor_padrao = 'T' %}
+                                    {% elif servidor.regime == 'diarista_intermediario' and dia.is_util %}
+                                        {% set valor_padrao = 'I' %}
                                     {% endif %}
 
                                     <select name="turno_{{ servidor.id }}_{{ dia.numero }}"
@@ -136,10 +142,13 @@
                                             data-is-util="{{ 'true' if dia.is_util else 'false' }}"
                                             style="font-size: 0.8rem;">
                                         <option value="-" {% if valor_padrao == '-' %}selected{% endif %}>-</option>
+                                        <option value="PD" {% if valor_padrao == 'PD' %}selected{% endif %}>PD</option>
+                                        <option value="PN" {% if valor_padrao == 'PN' %}selected{% endif %}>PN</option>
                                         <option value="M" {% if valor_padrao == 'M' %}selected{% endif %}>M</option>
                                         <option value="T" {% if valor_padrao == 'T' %}selected{% endif %}>T</option>
                                         <option value="N" {% if valor_padrao == 'N' %}selected{% endif %}>N</option>
                                         <option value="MT" {% if valor_padrao == 'MT' %}selected{% endif %}>MT</option>
+                                        <option value="I" {% if valor_padrao == 'I' %}selected{% endif %}>I</option>
                                         <option value="F" {% if valor_padrao == 'F' %}selected{% endif %}>F</option>
                                     </select>
                                 {% endif %}
