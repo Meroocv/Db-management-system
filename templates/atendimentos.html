@@ -149,7 +149,6 @@
         <div id="container_consultas_lista" style="display: none;">
           <div class="row g-2 mb-1 d-none d-md-flex" style="font-size: 13px; font-weight: 500; color: #666;">
             <div class="col-md-3">Data</div>
-            <div class="col-md-2">Horário</div>
             <div class="col-md-5">Profissional do Retorno</div>
             <div class="col-md-2">Ação</div>
           </div>
@@ -213,4 +212,10 @@
     </div>
   </div>
 </div>
+<input type="hidden" id="dados_profissionais_json" 
+       value='[
+           {% for prof in profissionais_habilitados %}
+               {"nome": "{{ prof.nome }}", "cbo": "{{ prof.cbo }}"}{% if not loop.last %},{% endif %}
+           {% endfor %}
+       ]'>
 {% endblock %}

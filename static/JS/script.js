@@ -402,26 +402,47 @@ function toggleSecaoPactuacao(containerId, checkbox) {
 }
 
 function adicionarLinhaConsulta() {
-  const container = document.getElementById('lista_consultas_futuras');
-  if (!container) return;
+    const container = document.getElementById('lista_consultas_futuras');
+    
+    // 1. Pegamos o JSON do input oculto que o HTML gerou
+    const inputJson = document.getElementById('dados_profissionais_json');
+    let profissionais = [];
+    
+    if (inputJson) {
+        try {
+            profissionais = JSON.parse(inputJson.value);
+        } catch (e) {
+            console.error("Erro ao processar lista de profissionais", e);
+        }
+    }
 
-  const novaLinha = document.createElement('div');
-  novaLinha.className = 'row g-2 mb-2 align-items-center linha-dinamica';
-  
-  novaLinha.innerHTML = `
-    <div class="col-md-3"><input type="date" name="data_proxima_consulta[]" required class="form-control form-control-sm"></div>
-    <div class="col-md-2"><input type="time" name="hora_proxima_consulta[]" required class="form-control form-control-sm"></div>
-    <div class="col-md-5">
-      <select name="profissional_proxima_consulta[]" required class="form-select form-control-sm">
-        <option value="">Selecione...</option>
-        <option value="Profissional Atual">Mesmo profissional atual</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removerLinhaDinamica(this)">Remover</button>
-    </div>
-  `;
-  container.appendChild(novaLinha);
+    // 2. Montamos as opções do select dinamicamente baseado na lista obtida
+    let opcoesMedicos = '<option value="">Selecione o profissional...</option>';
+    profissionais.forEach(prof => {
+        opcoesMedicos += `<option value="${prof.nome}">${prof.nome} (${prof.cbo})</option>`;
+    });
+
+    // 3. Criamos a linha injetando a string de opções que geramos acima
+    const linha = document.createElement('div');
+    linha.className = 'row g-2 mb-2 linha-consulta-futura';
+    
+    linha.innerHTML = `
+        <div class="col-md-3">
+            <input type="date" class="form-control consulta-data" name="data_proxima_consulta" required>
+        </div>
+        <div class="col-md-5">
+            <select class="form-select consulta-professional" name="profissional_proxima_consulta" required>
+                ${opcoesMedicos}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="this.closest('.row').remove()">
+                Remover
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(linha);
 }
 
 function adicionarLinhaGrupo() {
@@ -604,74 +625,157 @@ function fecharModalAtendimento() {
 }
 
 function salvarAtendimento() {
-  const valor = (id) => document.getElementById(id)?.value || '';
-  const modo = valor('modo_atendimento') || 'novo';
-  
-  // Captura os procedimentos selecionados como string separada por vírgula
-  const procedimentos = Array.from(document.querySelectorAll('input[name="procedimentos_atendimento"]:checked'))
-    .map(input => input.value)
-    .join(', ');
+    // ... suas coletas normais de prontuário, procedimentos, etc ...
 
-  // Validações básicas obrigatórias
-  const prontuario = valor('prontuario_atendimento');
-  const data_atendimento = valor('data_atendimento');
+    // Criamos as listas que o Flask espera receber
+    let data_proxima_consulta = [];
+    let hora_proxima_consulta = [];
+    let profissional_proxima_consulta = [];
 
-  if (!prontuario.trim()) {
-    alert("Informe o prontuário.");
-    document.getElementById('prontuario_atendimento')?.focus();
-    return;
-  }
+    // Se o checkbox de agendamento estiver marcado, coletamos as linhas
+    if (document.getElementById('marcar_consulta_futura').checked) {
+        document.querySelectorAll('.linha-consulta-futura').forEach(linha => {
+        const dataVal = linha.querySelector('.consulta-data').value;
+        const horaVal = linha.querySelector('.consulta-hora').value;
+        
+        // CORREÇÃO AQUI: Garanta que está escrito exatamente .consulta-professional
+        const campoProf = linha.querySelector('.consulta-professional');
+        
+        // Verificação de segurança para o script não travar caso não ache o campo
+        const profVal = campoProf ? campoProf.value : '';
 
-  if (!data_atendimento) {
-    alert("Informe a data do atendimento.");
-    document.getElementById('data_atendimento')?.focus();
-    return;
-  }
+        if (dataVal) {
+            data_proxima_consulta.push(dataVal);
+            hora_proxima_consulta.push(horaVal || '');
+            profissional_proxima_consulta.push(profVal || '');
+        }
+    });
+    }
 
-  if (!procedimentos) {
-    alert("Selecione ao menos um procedimento.");
-    return;
-  }
+    // Monte o objeto que será enviado via Fetch
+    const dadosFormulario = {
+        prontuario: document.getElementById('prontuario_atendimento').value,
+        data_atendimento: document.getElementById('data_atendimento').value,
+        procedimentos: obterProcedimentosMarcados(), // Ajuste conforme sua função
+        acolhimento_24h: document.getElementById('acolhimento_24h').value,
+        paciente_aceitou: document.getElementById('paciente_aceitou').value,
+        observacoes: document.getElementById('observacoes_atendimento').value,
+        
+        // CHAVE DO PROBLEMA: Aqui enviamos os arrays idênticos aos do Python
+        data_proxima_consulta: data_proxima_consulta,
+        hora_proxima_consulta: hora_proxima_consulta,
+        profissional_proxima_consulta: RiverProfValue(profissional_proxima_consulta) 
+    };
 
-  // Montagem do payload estruturado com as listas dinâmicas capturadas
-  const dadosFormulario = {
-    id: valor('atendimento_id'),
-    prontuario: prontuario,
-    data_atendimento: data_atendimento,
-    observacoes: valor('observacoes_atendimento'),
-    acolhimento_24h: valor('acolhimento_24h'),
-    paciente_aceitou: valor('paciente_aceitou'),
-    procedimentos: procedimentos,
-
-    // Captura da lista dinâmica: Consultas Individuais
-    data_proxima_consulta: Array.from(document.querySelectorAll('input[name="data_proxima_consulta[]"]')).map(el => el.value),
-    hora_proxima_consulta: Array.from(document.querySelectorAll('input[name="hora_proxima_consulta[]"]')).map(el => el.value),
-    profissional_proxima_consulta: Array.from(document.querySelectorAll('select[name="profissional_proxima_consulta[]"]')).map(el => el.value),
-
-    // Captura da lista dinâmica: Grupos / Acolhimento por Período
-    tipo_pactuacao_periodo: Array.from(document.querySelectorAll('select[name="tipo_pactuacao_periodo[]"]')).map(el => el.value),
-    data_inicio_pactuacao: Array.from(document.querySelectorAll('input[name="data_inicio_pactuacao[]"]')).map(el => el.value),
-    data_fim_pactuacao: Array.from(document.querySelectorAll('input[name="data_fim_pactuacao[]"]')).map(el => el.value),
-    dias_semana_acolhimento: Array.from(document.querySelectorAll('input[name="dias_semana_acolhimento[]"]')).map(el => el.value)
-  };
-
-  const url = (modo === 'editar' || modo === 'edit') ? '/atualizar_atendimento' : '/novo_atendimento';
-
-  fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(dadosFormulario)
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.mensagem || 'Atendimento salvo com sucesso!');
-    fecharModalAtendimento();
-    location.reload();
-  })
-  .catch(err => {
-    console.error('Erro ao salvar atendimento:', err);
-    alert('Erro ao salvar o atendimento no servidor.');
-  });
+    // Seu envio Fetch para /novo_atendimento continua aqui abaixo...
+    fetch('/novo_atendimento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dadosFormulario)
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.mensagem || data.erro);
+        if(!data.erro) window.location.reload();
+    });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalCalendario');
+    const fecharModal = document.getElementById('fecharModal');
+    const inputData = document.getElementById('dataFiltro');
+    const listaPacientes = document.getElementById('listaPacientesPopup');
+    const tituloMedico = document.getElementById('modalTituloMedico');
+    
+    let servidorSelecionadoId = null;
+
+    // 1. Monitora o clique nos botões dos cards
+    document.querySelectorAll('.btn-abrir-agenda').forEach(botao => {
+        botao.addEventListener('click', function() {
+            servidorSelecionadoId = this.getAttribute('data-id');
+            const nomeMedico = this.getAttribute('data-nome');
+            
+            tituloMedico.innerText = `Agenda: ${nomeMedico}`;
+            listaPacientes.innerHTML = "<p style='color: #94a3b8;'>Selecione um dia no calendário para ver os pacientes...</p>";
+            inputData.value = ""; // Limpa a data anterior
+            
+            modal.style.display = 'flex'; // Exibe o Pop-up/Modal do calendário
+        });
+    });
+
+    // 2. Fecha o modal
+    fecharModal.addEventListener('click', () => modal.style.display = 'none');
+
+    // 3. Quando o usuário escolher/clicar em um dia no calendário
+    inputData.addEventListener('change', function() {
+        const dataEscolhida = this.value; // Formato YYYY-MM-DD
+        
+        if(!servidorSelecionadoId || !dataEscolhida) return;
+
+        listaPacientes.innerHTML = "<p>Buscando agendamentos...</p>";
+
+        // Fazemos uma requisição assíncrona (Fetch) para buscar os pacientes reais no banco
+        fetch(`/api/agenda/pacientes?servidor_id=${servidorSelecionadoId}&data=${dataEscolhida}`)
+            .then(response => response.json())
+            .then(pacientes => {
+                listaPacientes.innerHTML = ""; // Limpa aviso de carregamento
+                
+                if(pacientes.length === 0) {
+                    listaPacientes.innerHTML = "<p style='color: #64748b;'>Nenhum paciente agendado para este dia.</p>";
+                    return;
+                }
+
+                // Renderiza a lista de pacientes dentro do pop-up
+                pacientes.forEach(p => {
+                    const item = document.createElement('div');
+                    item.style = "padding: 10px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between;";
+                    item.innerHTML = `
+                        <strong>${p.hora}</strong> 
+                        <span>${p.paciente_nome} (Prontuário: ${p.prontuario})</span>
+                    `;
+                    listaPacientes.appendChild(item);
+                });
+            })
+            .catch(err => {
+                listaPacientes.innerHTML = "<p style='color: red;'>Erro ao carregar a lista de pacientes.</p>";
+            });
+    });
+});
+
+// Abrir e Fechar Modal de Configuração (Apenas se o botão existir na tela)
+const btnConfig = document.getElementById('btnAbrirConfigPainel');
+const modalConfig = document.getElementById('modalConfigAgendas');
+const fecharModalConfig = document.getElementById('fecharModalConfig');
+
+if (btnConfig) {
+    btnConfig.addEventListener('click', () => modalConfig.style.display = 'flex');
+    fecharModalConfig.addEventListener('click', () => {
+        modalConfig.style.display = 'none';
+        window.location.reload(); // Recarrega para aplicar os cards novos na tela principal
+    });
+}
+
+// Ouvir cliques nos Checkboxes de permissão de agenda
+document.querySelectorAll('.chk-possui-agenda').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const servidorId = this.getAttribute('data-id');
+        const possuiAgenda = this.checked;
+
+        fetch('/api/servidor/configurar-agenda', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ servidor_id: servidorId, possui_agenda: possuiAgenda })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(!data.sucesso) {
+                alert("Erro ao salvar configuração.");
+                this.checked = !possuiAgenda; // Reverte se der erro
+            }
+        })
+        .catch(() => {
+            alert("Erro de conexão.");
+            this.checked = !possuiAgenda;
+        });
+    });
+});

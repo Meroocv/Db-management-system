@@ -124,6 +124,7 @@ class Servidor(db.Model):
     foto_perfil = db.Column(db.String(255))
     regime = db.Column(db.String(20), default="plantonista") 
     confirmado = db.Column(db.Boolean, default=False, nullable=False)  # NOVO CAMPO
+    possui_agenda = db.Column(db.Boolean, default=False, nullable=False)
     
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
@@ -575,9 +576,10 @@ def atendimentos():
         else_=0
     )
 
+    # MODIFICAÇÃO: Adicionado .label('data') em Atendimento.data_atendimento para casar com o seu HTML
     lista_atendimentos = db.session.query(
         Atendimento.id, Atendimento.prontuario, Paciente.nome_paciente,
-        Atendimento.data_atendimento, Atendimento.profissional, Atendimento.procedimentos,
+        Atendimento.data_atendimento.label('data'), Atendimento.profissional, Atendimento.procedimentos,
         Atendimento.acolhimento_24h, Atendimento.paciente_aceitou, Atendimento.observacoes,
         Atendimento.servidor_id, pode_editar_condicao.label('pode_editar'), Atendimento.created_at
     ).join(Paciente, Paciente.prontuario == Atendimento.prontuario, isouter=True)\
@@ -585,10 +587,15 @@ def atendimentos():
 
     prontuarios_atendidos = len({atend.prontuario for atend in lista_atendimentos})
 
+    # NOVA BUSCA: Filtrando apenas os profissionais de saúde que estão com a agenda ativa no sistema
+    profissionais_habilitados = Servidor.query.filter_by(confirmado=True, possui_agenda=True).order_by(Servidor.nome).all()
+
     contexto = contexto_usuario()
     contexto['atendimentos'] = lista_atendimentos
     contexto['prontuarios_atendidos'] = prontuarios_atendidos
-    return render_template('atendimentos.html', **contexto)
+    contexto['profissionais_habilitados'] = profissionais_habilitados  # <--- Injetado no contexto
+    
+    return render_template('atendimentos.html', **contexto) # (Garanta que o nome do arquivo seja exatamente o seu, atendimentos.html ou atendimento.html)
 
 
 @app.route('/novo_atendimento', methods=['POST'])
@@ -631,7 +638,6 @@ def novo_atendimento():
             nova_con = ConsultaFutura(
                 atendimento_id=novo.id,
                 data=datas_con[i],
-                hora=horas_con[i] if i < len(horas_con) else '',
                 profissional=prof_con[i] if i < len(prof_con) else ''
             )
             db.session.add(nova_con)
@@ -826,14 +832,83 @@ def agendas():
     if 'usuario' not in session:
         return redirect('/')
 
-    agendas = [
-        {"data": "2024-07-01", "hora": "10:00", "profissional": "Dr. Silva", "tipo": "Consulta"},
-        {"data": "2024-07-02", "hora": "14:00", "profissional": "Dra. Souza", "tipo": "Acolhimento Diurno"},
-    ]
+    # CORREÇÃO: Buscando pelo Nome do servidor, que é o que está na sua sessão
+    usuario_logado = Servidor.query.filter_by(nome=session['usuario']).first()
+    
+    # Proteção: Se mesmo assim não achar o usuário no banco, desloga ou nega o admin
+    if not usuario_logado:
+        eh_administrador = False
+    else:
+        eh_administrador = (usuario_logado.cbo == '411010')
+
+    # Resto do código continua igual...
+    servidores_com_agenda = Servidor.query.filter_by(confirmado=True, possui_agenda=True).all()
+
+    todos_profissionais = []
+    if eh_administrador:
+        todos_profissionais = Servidor.query.filter(
+            Servidor.confirmado == True, 
+            Servidor.cbo != '411010'
+        ).all()
 
     contexto = contexto_usuario()
-    contexto['agendas'] = agendas
+    contexto['servidores'] = servidores_com_agenda
+    contexto['todos_profissionais'] = todos_profissionais
+    contexto['eh_administrador'] = eh_administrador
+    
     return render_template('agendas.html', **contexto)
+
+@app.route('/api/servidor/configurar-agenda', methods=['POST'])
+def configurar_agenda():
+    if 'usuario' not in session:
+        return jsonify({"erro": "Não autorizado"}), 401
+        
+    data = request.json
+    servidor_id = data.get('servidor_id')
+    status_agenda = data.get('possui_agenda') # True ou False
+
+    servidor = Servidor.query.get(servidor_id)
+    if not servidor:
+        return jsonify({"erro": "Servidor não encontrado"}), 404
+
+    servidor.possui_agenda = status_agenda
+    db.session.commit()
+
+    return jsonify({"sucesso": True, "mensagem": f"Agenda de {servidor.nome} atualizada!"})
+
+@app.route('/api/agenda/pacientes', methods=['GET'])
+def buscar_pacientes_do_dia():
+    servidor_id = request.args.get('servidor_id')
+    data_selecionada = request.args.get('data') # Recebe YYYY-MM-DD do input html
+    
+    if not servidor_id or not data_selecionada:
+        return jsonify({"erro": "Parâmetros ausentes"}), 400
+        
+    try:
+        # Se seu banco salva como "DD/MM/AAAA", convertemos aqui:
+        data_objeto = datetime.strptime(data_selecionada, '%Y-%m-%d')
+        data_formatada_banco = data_objeto.strftime('%d/%m/%Y') 
+    except Exception as e:
+        # Se der erro na conversão, usa o que veio do front
+        data_formatada_banco = data_selecionada
+
+    # Realiza a busca usando o formato idêntico ao do seu banco de dados
+    consultas = db.session.query(ConsultaFutura, Paciente).\
+        join(Atendimento, ConsultaFutura.atendimento_id == Atendimento.id).\
+        join(Paciente, Atendimento.prontuario == Paciente.prontuario).\
+        filter(Atendimento.servidor_id == servidor_id).\
+        filter(ConsultaFutura.data == data_formatada_banco).\
+        order_by(ConsultaFutura.hora).all()
+        
+    resultado = []
+    for consulta, paciente in consultas:
+        resultado.append({
+            "hora": consulta.hora,
+            "prontuario": paciente.prontuario,
+            "paciente_nome": paciente.nome_social if paciente.nome_social else paciente.nome_paciente
+        })
+        
+    return jsonify(resultado) # Se não houver ninguém, retorna [], o que é correto!
 
 @app.route('/servidores')
 def servidores():

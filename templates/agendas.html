@@ -1,142 +1,87 @@
 {% extends 'base.html' %}
 
 {% block conteudo %}
-<div style="margin-top: 70px;" class="container-fluid py-4">
-
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3" style="margin-top: 75px;">
         <div>
             <h1 class="h3 mb-1 fw-bold text-secondary">Agenda</h1>
-            <p class="text-muted small mb-0">Visualize os agendamentos de todos os profissionais por ordem de chegada.</p>
+            <p class="text-muted small mb-0">Visualize os agendamentos de todos os profissionais.</p>
         </div>
 
-    </div>
-
-    <div class="d-flex gap-2 mb-4 flex-wrap">
-        <select class="form-select form-select-sm w-auto bg-white border-0 shadow-sm p-2 px-3">
-            <option>Todos os profissionais</option>
-        </select>
-        <select class="form-select form-select-sm w-auto bg-white border-0 shadow-sm p-2 px-3">
-            <option>Todos os tipos de atendimento</option>
-        </select>
-    </div>
-
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-4">
-        
-        {% for profissional in profissionais_agenda %}
-        <div class="col">
-            <div class="card card-profissional shadow-sm">
-                
-                <div class="header-profissional 
-                    {% if 'Psiquiatra' in profissional.especialidade %}psiq-bg
-                    {% elif 'Psicól' in profissional.especialidade %}psico-bg
-                    {% elif 'Ocupacional' in profissional.especialidade %}to-bg
-                    {% else %}as-bg{% endif %}">
-                    
-                    <h5 class="fw-bold mb-0 h6 text-truncate">{{ profissional.nome }}</h5>
-                    <small class="opacity-75 text-uppercase fw-semibold" style="font-size: 11px;">
-                        {{ profissional.especialidade }}
-                    </small>
-                    <div class="mt-2">
-                        <span class="badge bg-white text-dark rounded-pill shadow-sm px-2 py-1" style="font-size: 11px;">
-                            {{ profissional.fila|length }} na fila
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="card-body p-3" style="max-height: 600px; overflow-y: auto; background: #fafafa;">
-                    
-                    {% if profissional.fila %}
-                        {% for paciente in profissional.fila %}
-                            
-                            <div class="card-paciente p-3 mb-3 shadow-sm 
-                                {% if paciente.status == 'atendendo' %}status-em-atendimento
-                                {% elif paciente.status == 'aguardando' %}status-aguardando
-                                {% else %}status-finalizado{% endif %}">
-                                
-                                <div class="d-flex justify-content-between align-items-start mb-1">
-                                    <span class="numero-posicao 
-                                        {% if paciente.status == 'atendendo' %}bg-success text-white
-                                        {% elif paciente.status == 'aguardando' %}bg-primary text-white
-                                        {% else %}bg-secondary text-white{% endif %}">
-                                        {{ loop.index }}º
-                                    </span>
-                                    <small class="text-muted font-monospace" style="font-size: 11px;">Pront. {{ paciente.prontuario }}</small>
-                                </div>
-                                
-                                <div class="fw-bold text-dark text-truncate" style="font-size: 14px;">
-                                    {{ paciente.paciente_nome }}
-                                </div>
-                                <div class="text-muted small mt-1" style="font-size: 12px;">
-                                    <i class="bi bi-heart-pulse me-1"></i> {{ paciente.procedimento }}
-                                </div>
-                                
-                                <div class="mt-2 text-end">
-                                    {% if paciente.status == 'aguardando' %}
-                                        <button class="btn btn-xs btn-success py-0 px-2" style="font-size: 11px;" onclick="chamarPaciente('{{ paciente.id }}')">Chamar</button>
-                                    {% elif paciente.status == 'atendendo' %}
-                                        <button class="btn btn-xs btn-secondary py-0 px-2" style="font-size: 11px;" onclick="finalizarPaciente('{{ paciente.id }}')">Finalizar</button>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center py-5 text-muted">
-                            <i class="bi bi-people text-black-50 display-6"></i>
-                            <p class="small mt-2 mb-0">Nenhum paciente aguardando.</p>
-                        </div>
-                    {% endif %}
-
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
-    </div>
 </div>
 
-{% if usuario.perfil == 'administrativo' %}
-<div class="modal" id="modalConfigFila" tabindex="-1" style="background: rgba(0,0,0,0.5); display: none;">
-    <div class="modal-dialog">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Gerenciar Painel do Dia</h5>
-                <button type="button" class="btn-close btn-close-white" onclick="fecharConfiguracaoFila()"></button>
+{% if eh_administrador %}
+<button id="btnAbrirConfigPainel" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px;">
+    ⚙️ Configurar Exibição de Agendas
+</button>
+
+<div id="modalConfigAgendas" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1001; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 25px; border-radius: 16px; width: 90%; max-width: 600px; position: relative;">
+        <span id="fecharModalConfig" style="position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 20px;">&times;</span>
+        <h3>Gerenciar Profissionais com Agenda</h3>
+        <p style="color: #64748b; font-size: 14px;">Marque os profissionais que devem aparecer na tela de Agendas.</p>
+        
+        <div style="max-height: 350px; overflow-y: auto; margin-top: 15px;">
+            {% for prof in todos_profissionais %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                    <strong style="display: block; color: #1e293b;">{{ prof.nome }}</strong>
+                    <span style="font-size: 12px; color: #64748b;">CBO: {{ prof.cbo }}</span>
+                </div>
+                <input type="checkbox" class="chk-possui-agenda" data-id="{{ prof.id }}" 
+                       {% if prof.possui_agenda %} checked {% endif %}
+                       style="width: 20px; height: 20px; cursor: pointer;">
             </div>
-            <div class="modal-body">
-                <p class="small text-muted">Como o atendimento é por ordem de chegada, use esta tela para definir quais profissionais estão ativos hoje e limitar as vagas se necessário.</p>
-                <form id="formConfigFila">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Ativar Profissional no Painel</label>
-                        <select class="form-select" name="profissional_id">
-                            <option value="">Selecione para ativar...</option>
-                            {% for prof in lista_todos_profissionais %}
-                                <option value="{{ prof.id }}">{{ prof.nome }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Limite Máximo de Senhas (Opcional)</label>
-                        <input type="number" class="form-control" placeholder="Ex: 15 (Deixe em branco para ilimitado)">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="fecharConfiguracaoFila()">Fechar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarConfigFila()">Adicionar ao Painel</button>
-            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
 {% endif %}
 
-<script>
-    function abrirConfiguracaoFila() { document.getElementById('modalConfigFila').style.display = 'block'; }
-     Lorna = () => {}
-    function fecharConfiguracaoFila() { document.getElementById('modalConfigFila').style.display = 'none'; }
-    
-    function chamarPaciente(id) { console.log("Mudando status para 'atendendo' do ID: " + id); /* Seu fetch aqui */ }
-    function finalizarPaciente(id) { console.log("Mudando status para 'finalizado' do ID: " + id); /* Seu fetch aqui */ }
-    function salvarConfigFila() { alert('Painel atualizado!'); fecharConfiguracaoFila(); }
-</script>
+<div class="cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 20px;">
+    {% for servidor in servidores %}
+    <div class="card-medico" style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; position: relative;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            {% if usuario_foto %}
+            <img src="{{ url_for('static', filename=usuario_foto) }}" class="rounded-circle me-2 avatar-menu"
+            alt="Foto de {{ servidor.nome }}" 
+                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+            {% else %}
+                <img src="{{ url_for('static', filename='utilizador.png') }}" class="rounded-circle me-2 avatar-menu
+                alt="Foto de {{ servidor.nome }}" 
+                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;"">
+            {% endif %}
+            
+            <span class="status-badge" style="background: #e6f7ed; color: #26af63; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                Disponível
+            </span>
+        </div>
+
+        <h3 style="margin: 0 0 5px 0; font-size: 16px; color: #1e293b;">{{ servidor.nome }}</h3>
+        <p style="margin: 0 0 15px 0; font-size: 13px; color: #64748b;">CBO: {{ servidor.cbo }}</p>
+
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: #94a3b8;">Visualizar Escala</span>
+            
+            <button class="btn-abrir-agenda" data-id="{{ servidor.id }}" data-nome="{{ servidor.nome }}"
+                    style="background: #f1f5f9; border: none; width: 35px; height: 35px; border-radius: 8px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+                ➔
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="modalCalendario" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 25px; border-radius: 16px; width: 90%; max-width: 500px; position: relative;">
+        <span id="fecharModal" style="position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 20px;">&times;</span>
+        <h3 id="modalTituloMedico">Calendário de Atendimento</h3>
+        
+        <input type="date" id="dataFiltro" style="width: 100%; padding: 10px; margin-top: 15px; border-radius: 8px; border: 1px solid #ccc;">
+        
+        <div id="listaPacientesPopup" style="margin-top: 20px; max-height: 200px; overflow-y: auto;">
+            </div>
+    </div>
+</div>
 {% endblock %}
