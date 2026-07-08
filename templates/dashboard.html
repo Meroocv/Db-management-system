@@ -27,51 +27,7 @@
 
     </div>
 
-    {% if pode_aprovar_rh %}
-    <div class="card shadow-sm border-0 painel-rh">
-        <div class="card-body">
-            <h5>Solicitacoes de CBO</h5>
-            {% if solicitacoes_cbo %}
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Servidor</th>
-                            <th>Atual</th>
-                            <th>Solicitado</th>
-                            <th>Data</th>
-                            <th>Acoes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for solicitacao in solicitacoes_cbo %}
-                        <tr>
-                            <td>
-                                <strong>{{ solicitacao['name'] }}</strong><br>
-                                <small>{{ solicitacao['cpf'] }}</small>
-                            </td>
-                            <td>{{ cbo_opcoes.get(solicitacao['cbo_atual'], solicitacao['cbo_atual']) }}</td>
-                            <td>{{ cbo_opcoes.get(solicitacao['cbo_solicitado'], solicitacao['cbo_solicitado']) }}</td>
-                            <td>{{ solicitacao['criado_em'] }}</td>
-                            <td>
-                                <form action="/aprovar_cbo/{{ solicitacao['id'] }}" method="post" class="d-inline">
-                                    <button class="btn btn-sm btn-success" name="acao" value="aprovar" type="submit">Aprovar</button>
-                                </form>
-                                <form action="/aprovar_cbo/{{ solicitacao['id'] }}" method="post" class="d-inline">
-                                    <button class="btn btn-sm btn-outline-danger" name="acao" value="rejeitar" type="submit">Rejeitar</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Nenhuma solicitacao pendente.</p>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+    
 </div>
 
 

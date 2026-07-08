@@ -294,6 +294,137 @@ td:nth-child(5), th:nth-child(5) { max-width: 50px; }
 td:nth-child(6), th:nth-child(6) { max-width: 50px; }
 td:nth-child(7), th:nth-child(7) { max-width: 25px; }
 
+.escala-layout {
+    margin: 70px auto 0;
+    padding: 24px clamp(18px, 3vw, 42px);
+    max-width: 1680px;
+}
+
+.escala-layout .table-responsive,
+.afastamentos-grid .table-responsive {
+    min-width: 0;
+}
+
+.escala-table-shell {
+    max-height: 68vh;
+    overflow: auto;
+    background: #ffffff;
+}
+
+.escala-table-view {
+    min-width: 1420px;
+}
+
+.escala-table-edit {
+    min-width: 1520px;
+}
+
+.escala-table-view th,
+.escala-table-view td,
+.escala-table-edit th,
+.escala-table-edit td {
+    height: 48px;
+    max-width: none;
+    vertical-align: middle;
+}
+
+.escala-table-view th:first-child,
+.escala-table-view td:first-child,
+.escala-table-edit th:first-child,
+.escala-table-edit td:first-child {
+    min-width: 220px;
+    max-width: 320px;
+}
+
+.afastamentos-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.75fr);
+    gap: 20px;
+    width: min(100%, 1680px);
+    margin: 24px auto 0;
+    padding: 0 clamp(18px, 3vw, 42px) 32px;
+}
+
+.afastamento-panel {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+.afastamento-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid #edf0f4;
+    background: #f8fafc;
+}
+
+.afastamento-lista {
+    display: grid;
+    gap: 0;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.afastamento-item {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.afastamento-item:last-child {
+    border-bottom: 0;
+}
+
+.afastamento-item.definitivo {
+    background: linear-gradient(90deg, rgba(25, 135, 84, 0.06), #ffffff 42%);
+}
+
+.afastamento-acoes {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.afastamento-acoes .btn {
+    width: 34px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.afastamento-empty {
+    padding: 22px 18px;
+    color: #6b7280;
+    text-align: center;
+}
+
+@media (max-width: 1100px) {
+    .afastamentos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .afastamento-item {
+        grid-template-columns: 1fr;
+        align-items: start;
+    }
+
+    .afastamento-acoes {
+        justify-content: flex-start;
+    }
+}
+
 /* ==========================================================================
    4. MODAIS E FORM GRIDS
    ========================================================================== */

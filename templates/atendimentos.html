@@ -212,10 +212,11 @@
     </div>
   </div>
 </div>
-<input type="hidden" id="dados_profissionais_json" 
-       value='[
-           {% for prof in profissionais_habilitados %}
-               {"nome": "{{ prof.nome }}", "cbo": "{{ prof.cbo }}"}{% if not loop.last %},{% endif %}
-           {% endfor %}
-       ]'>
+<script id="dados_profissionais_json" type="application/json">
+  [
+    {% for prof in profissionais_habilitados %}
+      {"id": {{ prof.id }}, "nome": {{ prof.nome|tojson }}, "cbo": {{ prof.cbo|tojson }}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+</script>
 {% endblock %}

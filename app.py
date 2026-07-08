@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_mail import Mail, Message  # ADICIONADO
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature  # ADICIONADO
-from sqlalchemy import func, case, and_
+from sqlalchemy import func, case, and_, inspect
 from wtforms import StringField, SubmitField
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -163,6 +163,7 @@ class ConsultaFutura(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
+    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'))
     data = db.Column(db.String(10))
     hora = db.Column(db.String(5))
     profissional = db.Column(db.String(100))
@@ -209,6 +210,11 @@ class Afastamento(db.Model):
 
 with app.app_context():
     db.create_all()
+    colunas_consultas = [coluna['name'] for coluna in inspect(db.engine).get_columns('consultas_futuras')]
+    if 'servidor_id' not in colunas_consultas:
+        with db.engine.connect() as conexao:
+            conexao.exec_driver_sql('ALTER TABLE consultas_futuras ADD COLUMN servidor_id INTEGER')
+            conexao.commit()
 
 
 # ==========================================
@@ -245,8 +251,6 @@ def servidor_logado():
         return None
     return db.session.get(Servidor, session['usuario_id'])
 
-def pode_aprovar_rh():
-    return session.get('usuario_cbo') == '411010'
 
 def contexto_usuario():
     servidor = servidor_logado()
@@ -255,11 +259,80 @@ def contexto_usuario():
         'usuario_foto': session.get('usuario_foto'),
         'servidor': servidor,
         'cbo_opcoes': CBO_OPCOES,
-        'pode_aprovar_rh': pode_aprovar_rh(),
     }
 
 # NOVA FUNÇÃO AUXILIAR: Envio do token por e-mail
 # MODIFICADO: Envio do token com logs para o terminal
+def parse_data_agendamento(valor):
+    if not valor:
+        return None
+
+    for formato in ('%Y-%m-%d', '%d/%m/%Y'):
+        try:
+            return datetime.strptime(valor, formato).date()
+        except ValueError:
+            pass
+    return None
+
+def data_banco_agendamento(valor):
+    data_obj = parse_data_agendamento(valor)
+    if not data_obj:
+        return valor
+    return data_obj.strftime('%Y-%m-%d')
+
+def disponibilidade_profissional(servidor_id, data_valor):
+    data_obj = parse_data_agendamento(data_valor)
+    avisos = []
+
+    if not servidor_id:
+        return {"bloqueado": True, "mensagens": ["Selecione o profissional do retorno."]}
+
+    servidor = db.session.get(Servidor, servidor_id)
+    if not servidor:
+        return {"bloqueado": True, "mensagens": ["Profissional nao encontrado."]}
+
+    if not servidor.confirmado or not servidor.possui_agenda:
+        return {
+            "bloqueado": True,
+            "mensagens": [f"{servidor.nome} nao esta com agenda ativa no sistema."]
+        }
+
+    if not data_obj:
+        return {"bloqueado": True, "mensagens": ["Data da consulta invalida."]}
+
+    afastamentos = Afastamento.query.filter(
+        Afastamento.servidor_id == servidor.id,
+        Afastamento.data_inicio <= data_obj,
+        Afastamento.data_fim >= data_obj
+    ).all()
+
+    for afastamento in afastamentos:
+        periodo = f"{afastamento.data_inicio.strftime('%d/%m/%Y')} a {afastamento.data_fim.strftime('%d/%m/%Y')}"
+        status = (afastamento.status or '').lower()
+        mensagem = f"{servidor.nome} tem {afastamento.tipo} {status} no periodo de {periodo}."
+        if status == 'autorizado':
+            return {"bloqueado": True, "mensagens": [mensagem]}
+        if status == 'pendente':
+            avisos.append(mensagem)
+
+    turno = Escala.query.filter_by(
+        servidor_id=servidor.id,
+        dia=data_obj.day,
+        mes=data_obj.month,
+        ano=data_obj.year
+    ).first()
+
+    if turno and (turno.turno or '').strip().upper() in {'-', 'F', 'FE', 'A', 'L'}:
+        return {
+            "bloqueado": True,
+            "mensagens": [f"{servidor.nome} esta bloqueado na escala deste dia."]
+        }
+
+    if not turno:
+        avisos.append(f"{servidor.nome} ainda nao tem escala configurada para este dia.")
+
+    return {"bloqueado": False, "mensagens": avisos}
+
 def enviar_email_confirmacao(usuario_email, usuario_nome):
     print(f"📬 [MAILPIT] Iniciando montagem do e-mail para: {usuario_email}")
     try:
@@ -338,17 +411,8 @@ def dashboard():
     if 'usuario' not in session:
         return redirect('/')
 
-    solicitacoes_pendentes = []
-    if pode_aprovar_rh():
-        solicitacoes_pendentes = db.session.query(
-            SolicitacaoCBO.id, Servidor.nome, Servidor.cpf,
-            SolicitacaoCBO.cbo_atual, SolicitacaoCBO.cbo_solicitado, SolicitacaoCBO.criado_em
-        ).join(Servidor, Servidor.id == SolicitacaoCBO.servidor_id)\
-         .filter(SolicitacaoCBO.status == 'pendente')\
-         .order_by(SolicitacaoCBO.criado_em.asc()).all()
 
     contexto = contexto_usuario()
-    contexto['solicitacoes_cbo'] = solicitacoes_pendentes
     return render_template('dashboard.html', **contexto)
 
 
@@ -632,13 +696,46 @@ def novo_atendimento():
     datas_con = dados.get('data_proxima_consulta', [])
     horas_con = dados.get('hora_proxima_consulta', [])
     prof_con = dados.get('profissional_proxima_consulta', [])
+    avisos_agendamento = []
 
     for i in range(len(datas_con)):
         if datas_con[i]: 
+            servidor_destino = None
+            profissional_valor = prof_con[i] if i < len(prof_con) else ''
+            if str(profissional_valor).isdigit():
+                servidor_destino = db.session.get(Servidor, int(profissional_valor))
+            elif profissional_valor:
+                servidor_destino = Servidor.query.filter_by(nome=profissional_valor).first()
+
+            if not servidor_destino:
+                db.session.rollback()
+                return jsonify({'erro': 'Selecione um profissional valido para a consulta futura'}), 400
+
+            disponibilidade = disponibilidade_profissional(servidor_destino.id, datas_con[i])
+            if disponibilidade['bloqueado']:
+                db.session.rollback()
+                return jsonify({'erro': ' '.join(disponibilidade['mensagens'])}), 409
+
+            avisos_agendamento.extend(disponibilidade['mensagens'])
+
+            data_consulta = data_banco_agendamento(datas_con[i])
+            hora_consulta = horas_con[i] if i < len(horas_con) else ''
+            if hora_consulta:
+                conflito = ConsultaFutura.query.filter_by(
+                    servidor_id=servidor_destino.id,
+                    data=data_consulta,
+                    hora=hora_consulta
+                ).first()
+                if conflito:
+                    db.session.rollback()
+                    return jsonify({'erro': 'Este horario ja esta ocupado na agenda do profissional.'}), 409
+
             nova_con = ConsultaFutura(
                 atendimento_id=novo.id,
-                data=datas_con[i],
-                profissional=prof_con[i] if i < len(prof_con) else ''
+                servidor_id=servidor_destino.id,
+                data=data_consulta,
+                hora=hora_consulta,
+                profissional=servidor_destino.nome
             )
             db.session.add(nova_con)
 
@@ -662,7 +759,10 @@ def novo_atendimento():
             db.session.add(nova_pac)
 
     db.session.commit() 
-    return jsonify({'mensagem': 'Atendimento e pactuações cadastrados com sucesso!'})
+    return jsonify({
+        'mensagem': 'Atendimento e pactuacoes cadastrados com sucesso!',
+        'avisos': avisos_agendamento
+    })
 
 
 @app.route('/atualizar_atendimento', methods=['POST'])
@@ -748,29 +848,6 @@ def atualizar_perfil():
     session['usuario_foto'] = servidor.foto_perfil
     return redirect('/dashboard')
 
-
-@app.route('/aprovar_cbo/<int:solicitacao_id>', methods=['POST'])
-def aprovar_cbo(solicitacao_id):
-    if 'usuario_id' not in session or not pode_aprovar_rh():
-        return redirect('/dashboard')
-
-    acao = request.form.get('acao')
-    solicitacao = SolicitacaoCBO.query.filter_by(id=solicitacao_id, status='pendente').first()
-
-    if solicitacao:
-        if acao == 'aprovar':
-            servidor = db.session.get(Servidor, solicitacao.servidor_id)
-            if servidor:
-                servidor.cbo = solicitacao.cbo_solicitado
-            solicitacao.status = 'aprovada'
-        else:
-            solicitacao.status = 'rejeitada'
-
-        solicitacao.aprovado_por = session['usuario_id']
-        solicitacao.analisado_em = func.current_timestamp()
-        db.session.commit()
-
-    return redirect('/dashboard')
 
 
 @app.route('/logout')
@@ -883,21 +960,24 @@ def buscar_pacientes_do_dia():
     
     if not servidor_id or not data_selecionada:
         return jsonify({"erro": "Parâmetros ausentes"}), 400
-        
-    try:
-        # Se seu banco salva como "DD/MM/AAAA", convertemos aqui:
-        data_objeto = datetime.strptime(data_selecionada, '%Y-%m-%d')
-        data_formatada_banco = data_objeto.strftime('%d/%m/%Y') 
-    except Exception as e:
-        # Se der erro na conversão, usa o que veio do front
-        data_formatada_banco = data_selecionada
+
+    servidor = db.session.get(Servidor, int(servidor_id)) if str(servidor_id).isdigit() else None
+    if not servidor:
+        return jsonify({"erro": "Profissional nao encontrado"}), 404
+
+    data_objeto = parse_data_agendamento(data_selecionada)
+    data_iso = data_objeto.strftime('%Y-%m-%d') if data_objeto else data_selecionada
+    data_br = data_objeto.strftime('%d/%m/%Y') if data_objeto else data_selecionada
 
     # Realiza a busca usando o formato idêntico ao do seu banco de dados
     consultas = db.session.query(ConsultaFutura, Paciente).\
         join(Atendimento, ConsultaFutura.atendimento_id == Atendimento.id).\
         join(Paciente, Atendimento.prontuario == Paciente.prontuario).\
-        filter(Atendimento.servidor_id == servidor_id).\
-        filter(ConsultaFutura.data == data_formatada_banco).\
+        filter(
+            (ConsultaFutura.servidor_id == servidor.id) |
+            ((ConsultaFutura.servidor_id == None) & (ConsultaFutura.profissional == servidor.nome))
+        ).\
+        filter(ConsultaFutura.data.in_([data_iso, data_br])).\
         order_by(ConsultaFutura.hora).all()
         
     resultado = []
@@ -909,6 +989,17 @@ def buscar_pacientes_do_dia():
         })
         
     return jsonify(resultado) # Se não houver ninguém, retorna [], o que é correto!
+
+@app.route('/api/profissional/disponibilidade', methods=['GET'])
+def verificar_disponibilidade_profissional():
+    if 'usuario' not in session:
+        return jsonify({"erro": "Usuario nao autenticado"}), 401
+
+    servidor_id = request.args.get('servidor_id', type=int)
+    data_selecionada = request.args.get('data')
+    disponibilidade = disponibilidade_profissional(servidor_id, data_selecionada)
+    status = 409 if disponibilidade['bloqueado'] else 200
+    return jsonify(disponibilidade), status
 
 @app.route('/servidores')
 def servidores():
@@ -1114,6 +1205,8 @@ def configurar_escala():
     ]
 
     afastamentos_lista = Afastamento.query.order_by(Afastamento.data_inicio.desc()).all()
+    afastamentos_pendentes = [a for a in afastamentos_lista if a.status == 'Pendente']
+    afastamentos_definitivos = [a for a in afastamentos_lista if a.status == 'Autorizado']
 
     contexto = contexto_usuario()
     contexto.update({
@@ -1122,6 +1215,8 @@ def configurar_escala():
         'mes_config': mes,
         'ano_config': ano,
         'afastamentos_lista': afastamentos_lista,
+        'afastamentos_pendentes': afastamentos_pendentes,
+        'afastamentos_definitivos': afastamentos_definitivos,
         'meses_ano': meses_ano
     })
     return render_template('configurar_escala.html', **contexto)

@@ -410,7 +410,7 @@ function adicionarLinhaConsulta() {
     
     if (inputJson) {
         try {
-            profissionais = JSON.parse(inputJson.value);
+            profissionais = JSON.parse(inputJson.textContent || inputJson.value || '[]');
         } catch (e) {
             console.error("Erro ao processar lista de profissionais", e);
         }
@@ -419,7 +419,7 @@ function adicionarLinhaConsulta() {
     // 2. Montamos as opções do select dinamicamente baseado na lista obtida
     let opcoesMedicos = '<option value="">Selecione o profissional...</option>';
     profissionais.forEach(prof => {
-        opcoesMedicos += `<option value="${prof.nome}">${prof.nome} (${prof.cbo})</option>`;
+        opcoesMedicos += `<option value="${prof.id}" data-nome="${prof.nome}">${prof.nome} (${prof.cbo})</option>`;
     });
 
     // 3. Criamos a linha injetando a string de opções que geramos acima
@@ -428,10 +428,13 @@ function adicionarLinhaConsulta() {
     
     linha.innerHTML = `
         <div class="col-md-3">
-            <input type="date" class="form-control consulta-data" name="data_proxima_consulta" required>
+            <input type="date" class="form-control consulta-data" name="data_proxima_consulta" onchange="verificarDisponibilidadeLinha(this)" required>
+        </div>
+        <div class="col-md-2">
+            <input type="time" class="form-control consulta-hora" name="hora_proxima_consulta">
         </div>
         <div class="col-md-5">
-            <select class="form-select consulta-professional" name="profissional_proxima_consulta" required>
+            <select class="form-select consulta-professional" name="profissional_proxima_consulta" onchange="verificarDisponibilidadeLinha(this)" required>
                 ${opcoesMedicos}
             </select>
         </div>
@@ -440,9 +443,49 @@ function adicionarLinhaConsulta() {
                 Remover
             </button>
         </div>
+        <div class="col-12 aviso-disponibilidade small"></div>
     `;
     
     container.appendChild(linha);
+}
+
+function verificarDisponibilidadeLinha(campo) {
+  const linha = campo.closest('.linha-consulta-futura');
+  if (!linha) return;
+
+  const data = linha.querySelector('.consulta-data')?.value || '';
+  const profissionalId = linha.querySelector('.consulta-professional')?.value || '';
+  const aviso = linha.querySelector('.aviso-disponibilidade');
+  const botaoSalvar = document.getElementById('btnSalvarAtendimento');
+
+  if (!aviso || !data || !profissionalId) {
+    if (aviso) aviso.innerHTML = '';
+    return;
+  }
+
+  fetch(`/api/profissional/disponibilidade?servidor_id=${profissionalId}&data=${data}`)
+    .then(async resposta => {
+      const corpo = await resposta.json();
+      aviso.innerHTML = '';
+
+      if (corpo.mensagens && corpo.mensagens.length) {
+        aviso.innerHTML = corpo.mensagens.map(msg => `<div>${msg}</div>`).join('');
+        aviso.className = `col-12 aviso-disponibilidade small ${corpo.bloqueado ? 'text-danger' : 'text-warning'}`;
+      }
+
+      linha.dataset.bloqueado = corpo.bloqueado ? 'true' : 'false';
+      if (botaoSalvar) {
+        const temBloqueio = Array.from(document.querySelectorAll('.linha-consulta-futura'))
+          .some(item => item.dataset.bloqueado === 'true');
+        botaoSalvar.disabled = temBloqueio;
+      }
+    })
+    .catch(() => {
+      aviso.innerHTML = '<div>Erro ao verificar disponibilidade.</div>';
+      aviso.className = 'col-12 aviso-disponibilidade small text-danger';
+      linha.dataset.bloqueado = 'true';
+      if (botaoSalvar) botaoSalvar.disabled = true;
+    });
 }
 
 function adicionarLinhaGrupo() {
@@ -624,19 +667,32 @@ function fecharModalAtendimento() {
   if (modal) modal.style.display = 'none';
 }
 
+function obterProcedimentosMarcados() {
+  return Array.from(document.querySelectorAll('input[name="procedimentos_atendimento"]:checked'))
+    .map(input => input.value)
+    .join(', ');
+}
+
 function salvarAtendimento() {
-    // ... suas coletas normais de prontuário, procedimentos, etc ...
+    if (Array.from(document.querySelectorAll('.linha-consulta-futura')).some(linha => linha.dataset.bloqueado === 'true')) {
+        alert('Existe consulta futura bloqueada por escala ou afastamento. Ajuste antes de salvar.');
+        return;
+    }
 
     // Criamos as listas que o Flask espera receber
     let data_proxima_consulta = [];
     let hora_proxima_consulta = [];
     let profissional_proxima_consulta = [];
+    let tipo_pactuacao_periodo = [];
+    let data_inicio_pactuacao = [];
+    let data_fim_pactuacao = [];
+    let dias_semana_acolhimento = [];
 
     // Se o checkbox de agendamento estiver marcado, coletamos as linhas
     if (document.getElementById('marcar_consulta_futura').checked) {
         document.querySelectorAll('.linha-consulta-futura').forEach(linha => {
-        const dataVal = linha.querySelector('.consulta-data').value;
-        const horaVal = linha.querySelector('.consulta-hora').value;
+        const dataVal = linha.querySelector('.consulta-data')?.value || '';
+        const horaVal = linha.querySelector('.consulta-hora')?.value || '';
         
         // CORREÇÃO AQUI: Garanta que está escrito exatamente .consulta-professional
         const campoProf = linha.querySelector('.consulta-professional');
@@ -652,6 +708,15 @@ function salvarAtendimento() {
     });
     }
 
+    if (document.getElementById('marcar_grupo_futuro')?.checked) {
+        document.querySelectorAll('#lista_grupos_futuros .linha-dinamica').forEach(linha => {
+            tipo_pactuacao_periodo.push(linha.querySelector('select[name="tipo_pactuacao_periodo[]"]')?.value || '');
+            data_inicio_pactuacao.push(linha.querySelector('input[name="data_inicio_pactuacao[]"]')?.value || '');
+            data_fim_pactuacao.push(linha.querySelector('input[name="data_fim_pactuacao[]"]')?.value || '');
+            dias_semana_acolhimento.push(linha.querySelector('input[name="dias_semana_acolhimento[]"]')?.value || '');
+        });
+    }
+
     // Monte o objeto que será enviado via Fetch
     const dadosFormulario = {
         prontuario: document.getElementById('prontuario_atendimento').value,
@@ -664,7 +729,11 @@ function salvarAtendimento() {
         // CHAVE DO PROBLEMA: Aqui enviamos os arrays idênticos aos do Python
         data_proxima_consulta: data_proxima_consulta,
         hora_proxima_consulta: hora_proxima_consulta,
-        profissional_proxima_consulta: RiverProfValue(profissional_proxima_consulta) 
+        profissional_proxima_consulta: profissional_proxima_consulta,
+        tipo_pactuacao_periodo: tipo_pactuacao_periodo,
+        data_inicio_pactuacao: data_inicio_pactuacao,
+        data_fim_pactuacao: data_fim_pactuacao,
+        dias_semana_acolhimento: dias_semana_acolhimento
     };
 
     // Seu envio Fetch para /novo_atendimento continua aqui abaixo...
@@ -675,7 +744,8 @@ function salvarAtendimento() {
     })
     .then(res => res.json())
     .then(data => {
-        alert(data.mensagem || data.erro);
+        const avisos = Array.isArray(data.avisos) && data.avisos.length ? `\n\nAvisos:\n${data.avisos.join('\n')}` : '';
+        alert((data.mensagem || data.erro) + avisos);
         if(!data.erro) window.location.reload();
     });
 }

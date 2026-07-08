@@ -2,7 +2,7 @@
 
 {% block conteudo %}
 
-<div style="margin-top: 70px;" class="container mt-5">
+<div class="container-fluid escala-layout">
     
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -43,8 +43,8 @@
         <input type="hidden" name="mes" value="{{ mes_config }}">
         <input type="hidden" name="ano" value="{{ ano_config }}">
 
-        <div class="table-responsive shadow-sm border rounded">
-            <table class="table table-bordered table-hover align-middle m-0" style="min-width: 1300px;">
+        <div class="table-responsive escala-table-shell shadow-sm border rounded">
+            <table class="table table-bordered table-hover align-middle m-0 escala-table-edit">
                 <thead class="table-dark text-center">
                     <tr>
                         <th style="min-width: 240px; position: sticky; left: 0; background-color: #212529; z-index: 3;">Servidores</th>
@@ -163,111 +163,116 @@
     </form>
 </div>
 
-<div class="card mt-5 shadow-sm border rounded-4">
-    <div class="card-header bg-dark text-white py-3 px-4 rounded-top-4 d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold"><i class="bi bi-shield-check me-2"></i> Solicitações de Afastamentos e Férias</h5>
-        <span class="badge bg-warning text-dark fw-bold">Aprovação Pendente</span>
+<section class="afastamentos-grid">
+    <div class="afastamento-panel">
+        <div class="afastamento-panel-header">
+            <div>
+                <h5 class="m-0 fw-bold">Solicitações de Afastamentos e Férias</h5>
+                <small class="text-muted">Pedidos aguardando aprovação.</small>
+            </div>
+            <span class="badge bg-warning text-dark fw-bold">{{ afastamentos_pendentes|length }} pendente(s)</span>
+        </div>
+
+        <div class="afastamento-lista">
+            {% for afastamento in afastamentos_pendentes %}
+            <article class="afastamento-item">
+                <div>
+                    <div class="fw-bold">{{ afastamento.servidor.nome }}</div>
+                    <div class="text-muted small">{{ afastamento.data_inicio.strftime('%d/%m/%Y') }} até {{ afastamento.data_fim.strftime('%d/%m/%Y') }}</div>
+                </div>
+                <span class="badge {% if afastamento.tipo == 'Férias' %}bg-primary-subtle text-primary{% else %}bg-info-subtle text-info{% endif %}">
+                    {{ afastamento.tipo }}
+                </span>
+                <div class="afastamento-acoes">
+                    <form action="{{ url_for('autorizar_afastamento', id=afastamento.id) }}" method="POST" class="m-0">
+                        <button type="submit" class="btn btn-sm btn-success" title="Autorizar">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditarAfastamento{{ afastamento.id }}" title="Alterar Dias">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <form action="{{ url_for('cancelar_afastamento', id=afastamento.id) }}" method="POST" class="m-0" onsubmit="return confirm('Tem certeza que deseja cancelar este afastamento?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </article>
+            {% else %}
+            <div class="afastamento-empty">Nenhuma solicitação pendente.</div>
+            {% endfor %}
+        </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle m-0 text-center">
-                <thead class="table-light">
-                    <tr>
-                        <th class="text-start ps-4">Servidor</th>
-                        <th>Tipo</th>
-                        <th>Período</th>
-                        <th>Status</th>
-                        <th class="pe-4">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for afastamento in afastamentos_lista %}
-                    <tr>
-                        <td class="text-start ps-4">
-                            <div class="fw-bold">{{ afastamento.servidor.nome }}</div>
-                        </td>
-                        <td>
-                            <span class="badge {% if afastamento.tipo == 'Férias' %}bg-primary-subtle text-primary{% else %}bg-info-subtle text-info{% endif %} fw-semibold px-2.5 py-1.5">
-                                {{ afastamento.tipo }}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="small fw-semibold text-secondary">
-                                {{ afastamento.data_inicio.strftime('%d/%m/%Y') }} até {{ afastamento.data_fim.strftime('%d/%m/%Y') }}
-                            </div>
-                        </td>
-                        <td>
-                            {% if afastamento.status == 'Pendente' %}
-                                <span class="badge bg-warning text-dark border border-warning-subtle px-2 py-1"><i class="bi bi-clock-history"></i> Pendente</span>
-                            {% elif afastamento.status == 'Autorizado' %}
-                                <span class="badge bg-success text-white border border-success-subtle px-2 py-1"><i class="bi bi-check-circle"></i> Autorizado</span>
-                            {% else %}
-                                <span class="badge bg-danger text-white border border-danger-subtle px-2 py-1"><i class="bi bi-x-circle"></i> Recusado</span>
-                            {% endif %}
-                        </td>
-                        <td class="pe-4">
-                            <div class="d-flex justify-content-center gap-2">
-                                {% if afastamento.status == 'Pendente' %}
-                                <form action="{{ url_for('autorizar_afastamento', id=afastamento.id) }}" method="POST" class="m-0">
-                                    <button type="submit" class="btn btn-sm btn-success fw-bold px-2 py-1" title="Autorizar">
-                                        <i class="bi bi-check-lg"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                                
-                                <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" 
-                                        data-bs-toggle="modal" data-bs-target="#modalEditarAfastamento{{ afastamento.id }}" title="Alterar Dias">
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
 
-                                <form action="{{ url_for('cancelar_afastamento', id=afastamento.id) }}" method="POST" class="m-0" onsubmit="return confirm('Tem certeza que deseja cancelar este afastamento?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1" title="Cancelar Afastamento">
-                                        <i class="bi bi-trash3"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
+    <div class="afastamento-panel">
+        <div class="afastamento-panel-header">
+            <div>
+                <h5 class="m-0 fw-bold">Afastamentos Definitivos</h5>
+                <small class="text-muted">Férias aprovadas, atestados e afastamentos autorizados.</small>
+            </div>
+            <span class="badge bg-success text-white fw-bold">{{ afastamentos_definitivos|length }} ativo(s)</span>
+        </div>
 
-                    <div class="modal fade" id="modalEditarAfastamento{{ afastamento.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false" style="z-index: 1060; background: rgba(0, 0, 0, 0.5);">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content border-0 shadow rounded-4">
-                                <div class="modal-header bg-dark text-white border-bottom-0 py-3 px-4">
-                                    <h5 class="modal-title fw-bold mb-0">Alterar Período de {{ afastamento.tipo }}</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <form action="{{ url_for('editar_afastamento', id=afastamento.id) }}" method="POST">
-                                    <div class="modal-body p-4 bg-white text-start">
-                                        <p class="text-muted small">Ajustando período para o colaborador: <strong>{{ afastamento.servidor.nome }}</strong></p>
-                                        <div class="row g-3">
-                                            <div class="col-6">
-                                                <label class="form-label fw-bold text-secondary small">Nova Data de Início</label>
-                                                <input type="date" name="data_inicio" value="{{ afastamento.data_inicio.strftime('%Y-%m-%d') }}" class="form-control border-2" required>
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label fw-bold text-secondary small">Nova Data de Fim</label>
-                                                <input type="date" name="data_fim" value="{{ afastamento.data_fim.strftime('%Y-%m-%d') }}" class="form-control border-2" required>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer border-top-0 p-4 pt-0 bg-white">
-                                        <button type="button" class="btn btn-light border fw-semibold px-4" data-bs-dismiss="modal">Manter</button>
-                                        <button type="submit" class="btn btn-dark fw-bold px-4 shadow-sm">Salvar Alterações</button>
-                                    </div>
-                                </form>
-                            </div>
+        <div class="afastamento-lista">
+            {% for afastamento in afastamentos_definitivos %}
+            <article class="afastamento-item definitivo">
+                <div>
+                    <div class="fw-bold">{{ afastamento.servidor.nome }}</div>
+                    <div class="text-muted small">{{ afastamento.data_inicio.strftime('%d/%m/%Y') }} até {{ afastamento.data_fim.strftime('%d/%m/%Y') }}</div>
+                </div>
+                <span class="badge {% if afastamento.tipo == 'Férias' %}bg-primary-subtle text-primary{% else %}bg-info-subtle text-info{% endif %}">
+                    {{ afastamento.tipo }}
+                </span>
+                <div class="afastamento-acoes">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditarAfastamento{{ afastamento.id }}" title="Alterar Dias">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <form action="{{ url_for('cancelar_afastamento', id=afastamento.id) }}" method="POST" class="m-0" onsubmit="return confirm('Tem certeza que deseja cancelar este afastamento?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </article>
+            {% else %}
+            <div class="afastamento-empty">Nenhum afastamento definitivo.</div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% for afastamento in afastamentos_lista %}
+<div class="modal fade" id="modalEditarAfastamento{{ afastamento.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false" style="z-index: 1060; background: rgba(0, 0, 0, 0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header bg-dark text-white border-bottom-0 py-3 px-4">
+                <h5 class="modal-title fw-bold mb-0">Alterar Período de {{ afastamento.tipo }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('editar_afastamento', id=afastamento.id) }}" method="POST">
+                <div class="modal-body p-4 bg-white text-start">
+                    <p class="text-muted small">Ajustando período para o colaborador: <strong>{{ afastamento.servidor.nome }}</strong></p>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary small">Nova Data de Início</label>
+                            <input type="date" name="data_inicio" value="{{ afastamento.data_inicio.strftime('%Y-%m-%d') }}" class="form-control border-2" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary small">Nova Data de Fim</label>
+                            <input type="date" name="data_fim" value="{{ afastamento.data_fim.strftime('%Y-%m-%d') }}" class="form-control border-2" required>
                         </div>
                     </div>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="text-muted py-4">Nenhum pedido de férias ou afastamento lançado para este período.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                </div>
+                <div class="modal-footer border-top-0 p-4 pt-0 bg-white">
+                    <button type="button" class="btn btn-light border fw-semibold px-4" data-bs-dismiss="modal">Manter</button>
+                    <button type="submit" class="btn btn-dark fw-bold px-4 shadow-sm">Salvar Alterações</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+{% endfor %}
 
 <script>
 document.querySelectorAll('.js-select-regime').forEach(selectRegime => {
