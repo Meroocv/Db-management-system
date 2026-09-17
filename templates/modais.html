@@ -1,0 +1,369 @@
+<div id="modalPaciente" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="fecharModal()">&times;</span>
+    <h2>Prontuário do Paciente</h2>
+
+    <!-- ABAS -->
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link active" aria-current="page" role="button" onclick="abrirAba('identificacao', this)">Identificação</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" aria-current="page" role="button" onclick="abrirAba('pessoal', this)">Pessoal</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-link" aria-current="page" role="button" onclick="abrirAba('familia', this)">Família</a>
+      </li>
+      <li class="nav-item"> 
+        <a class="nav-link" aria-current="page" role="button" onclick="abrirAba('endereco', this)">Endereço</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" aria-current="page" role="button" onclick="abrirAba('status', this)">Status</a>
+      </li>
+    </ul>
+
+    <!-- CONTEÚDO -->
+
+    <div id="identificacao" class="aba form-grid">
+      <input type="hidden" id="modo">
+      <label>Prontuário:</label>
+      <input id="prontuario" readonly>
+
+      <label>Nome do Paciente:</label>
+      <input id="nome_paciente" maxlength="120" required readonly>
+
+      <label>Nome Social:</label>
+      <input id="nome_social" maxlength="120" readonly>
+
+      <label>CPF:</label>
+      <input id="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" readonly>
+
+      <label>RG:</label>
+      <input id="rg" maxlength="20" readonly>
+
+      <label>CNS:</label>
+      <input id="cns_paciente" inputmode="numeric" maxlength="15" readonly>
+    </div>
+
+    <div id="familia" class="aba form-grid" style="display:none;">
+      <label>Mãe:</label>
+      <input id="nome_mae" readonly>
+
+      <label>Pai:</label>
+      <input id="nome_pai" readonly>
+
+      <label>Responsável:</label>
+      <input id="nome_responsavel" readonly>
+
+      <label>Parentesco:</label>
+      <input id="grau_parentesco_responsavel" readonly>
+
+      <div class="campo-largo" style="grid-column: span 12; margin-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="font-weight: bold; margin: 0;">Telefones de Contato</label>
+          <button type="button" id="btn-adicionar-telefone" class="acao" onclick="adicionarTelefone()" style="width: auto;">+ Adicionar</button>
+        </div>
+        
+        <style>
+          .oculto { display: none !important; }
+          .linha-telefone input, .linha-telefone select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }</style>
+
+          <div id="container-telefones">
+            <div class="linha-telefone" style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; align-items: end; background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e6eaf0;">
+            
+                <div style="grid-column: span 2;">
+                  <label style="font-size: 11px; color: #666;">DDD</label>
+                  <input type="text" name="ddd[]" placeholder="Ex: 11" maxlength="2" required>
+                </div>
+            
+                <div style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Número</label>
+                    <input type="text" name="numero_telefone[]" placeholder="99999-9999" required>
+                </div>
+            
+                <div style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Pertence a</label>
+                    <select name="tipo_telefone[]" onchange="toggleCamposFamiliar(this)">
+                        <option value="Paciente">Paciente</option>
+                        <option value="Familiar">Familiar</option>
+                    </select>
+                </div>
+            
+                <div class="campos-familiar oculto" style="grid-column: span 3;">
+                    <label style="font-size: 11px; color: #666;">Familiar (Nome / Parentesco)</label>
+                    <input type="text" name="nome_familiar[]" placeholder="Nome" style="margin-bottom: 4px;">
+                    <input type="text" name="parentesco_familiar[]" placeholder="Parentesco">
+                </div>
+                {% if readonly == False %}
+                <div style="grid-column: span 1; text-align: center;">
+                  {% if loop.index > 1 %}
+                    <button type="button" class="acao" style="background: #dc3545; color: white; border: none; margin-bottom: 4px;" disabled>&times;</button>
+                  {% endif %}
+                </div>
+                {% endif %}
+            </div>
+          </div> 
+        </div>
+    </div> 
+
+    <div id="pessoal" class="aba form-grid" style="display:none;">
+      <label>Data de Nascimento:</label>
+      <input id="data_nascimento" type="date" required readonly>
+
+      <label>Sexo:</label>
+      <select id="sexo" disabled>
+        <option value="">Selecione</option>
+        <option value="M">M</option>
+        <option value="F">F</option>
+      </select>
+
+      <label>Naturalidade:</label>
+      <input id="naturalidade" readonly>
+
+      <label>Raça/Cor:</label>
+      <select id="raca_cor" disabled>
+        <option value="">Selecione</option>
+        <option value="Branca">Branca</option>
+        <option value="Preta">Preta</option>
+        <option value="Parda">Parda</option>
+        <option value="Amarela">Amarela</option>
+        <option value="Indigena">Indigena</option>
+        <option value="Nao informado">Nao informado</option>
+      </select>
+
+      <label>Escolaridade:</label>
+      <select id="escolaridade" disabled>
+        <option value="">Selecione</option>
+        <option value="Nao alfabetizado">Nao alfabetizado</option>
+        <option value="Ensino fundamental incompleto">Ensino fundamental incompleto</option>
+        <option value="Ensino fundamental completo">Ensino fundamental completo</option>
+        <option value="Ensino medio incompleto">Ensino medio incompleto</option>
+        <option value="Ensino medio completo">Ensino medio completo</option>
+        <option value="Ensino tecnico">Ensino tecnico</option>
+        <option value="Ensino superior incompleto">Ensino superior incompleto</option>
+        <option value="Ensino superior completo">Ensino superior completo</option>
+        <option value="Pos-graduacao">Pos-graduacao</option>
+        <option value="Nao informado">Nao informado</option>
+      </select>
+
+      <label>Etnia:</label>
+      <input id="etnia" readonly>
+
+      <label>Orientação Religiosa:</label>
+      <input id="orientacao_religiosa" readonly>
+    </div>
+
+    <div id="endereco" class="aba form-grid" style="display:none;">
+      <label>Município:</label>
+      <input id="municipio" readonly>
+
+      <label>UF:</label>
+      <select id="uf" disabled>
+        <option value="">UF</option>
+        <option value="AC">AC</option>
+        <option value="AL">AL</option>
+        <option value="AP">AP</option>
+        <option value="AM">AM</option>
+        <option value="BA">BA</option>
+        <option value="CE">CE</option>
+        <option value="DF">DF</option>
+        <option value="ES">ES</option>
+        <option value="GO">GO</option>
+        <option value="MA">MA</option>
+        <option value="MT">MT</option>
+        <option value="MS">MS</option>
+        <option value="MG">MG</option>
+        <option value="PA">PA</option>
+        <option value="PB">PB</option>
+        <option value="PR">PR</option>
+        <option value="PE">PE</option>
+        <option value="PI">PI</option>
+        <option value="RJ">RJ</option>
+        <option value="RN">RN</option>
+        <option value="RS">RS</option>
+        <option value="RO">RO</option>
+        <option value="RR">RR</option>
+        <option value="SC">SC</option>
+        <option value="SP">SP</option>
+        <option value="SE">SE</option>
+        <option value="TO">TO</option>
+      </select>
+
+      <label>Zona:</label>
+      <select id="zona" disabled>
+        <option value="">Selecione</option>
+        <option value="Urbana">Urbana</option>
+        <option value="Rural">Rural</option>
+      </select>
+
+      <label>CEP:</label>
+      <input id="cep" inputmode="numeric" maxlength="9" placeholder="00000-000" readonly>
+
+      <label>Bairro:</label>
+      <input id="bairro" readonly>
+
+      <label>Logradouro:</label>
+      <input id="logradouro" readonly>
+
+      <label>Número:</label>
+      <input id="numero" inputmode="numeric" maxlength="10" readonly>
+
+      <label>Complemento:</label>
+      <input id="complemento" readonly>
+    </div>
+
+    <div id="status" class="aba form-grid" style="display:none;">
+      <label>Status:</label>
+      <select id="statusPaciente" disabled>
+        <option value="">Selecione</option>
+        <option value="Ativo">Ativo</option>
+        <option value="Em avaliacao">Em avaliacao</option>
+        <option value="Em atendimento">Em atendimento</option>
+        <option value="Aguardando">Aguardando</option>
+        <option value="Alta">Alta</option>
+        <option value="Desligado">Desligado</option>
+      </select>
+
+      <label>Terapêuta de Referência:</label>
+      <input id="terapeuta_referencia" readonly>
+
+      <label>CID:</label>
+      <input id="cid" readonly>
+
+      <label>Admissão:</label>
+      <input id="data_admissao" type="date" readonly>
+
+      <label>Conclusão:</label>
+      <input id="data_conclusao" type="date" readonly>
+    </div>
+
+    <br><br>
+
+     <!-- BOTÕES -->
+
+    <button type="button" id="btnSalvar" onclick="salvarEdicao()" style="display:none;">
+      💾 Salvar
+    </button>
+
+
+  </div>
+</div>
+
+
+{% if servidor %}
+<div id="modalPerfil" class="modal">
+  <div class="modal-content modal-perfil">
+    <span class="close" onclick="fecharModalPerfil()">&times;</span>
+    <h2>Meu perfil</h2>
+
+    <form action="/atualizar_perfil" method="post" enctype="multipart/form-data">
+      <div class="perfil-topo">
+        {% if usuario_foto %}
+          <img src="{{ url_for('static', filename=usuario_foto) }}" class="avatar-perfil">
+        {% else %}
+          <img src="{{ url_for('static', filename='utilizador.png') }}" class="avatar-perfil">
+        {% endif %}
+        <div>
+          <label>Foto de perfil</label>
+          <input type="file" name="foto_perfil" accept="image/png,image/jpeg,image/webp">
+          <small>PNG, JPG ou WEBP ate 2 MB.</small>
+        </div>
+      </div>
+
+      <label>CNES</label>
+      <input type="text" name="cnes" value="{{ servidor['cnes'] }}" required>
+
+      <label>Nome</label>
+      <input type="text" name="name" value="{{ servidor['name'] }}" required>
+
+      <label>E-mail</label>
+      <input type="email" name="email" value="{{ servidor['email'] }}" required>
+
+      </select>
+      <small>Alteracoes de CBO ficam pendentes ate aprovacao por Assistente em Administracao.</small>
+
+      <div class="acoes-modal">
+        <button type="button" onclick="fecharModalPerfil()">Cancelar</button>
+        <button type="submit">Salvar perfil</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div id="modalAtendimento" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="fecharModalAtendimento()">&times;</span>
+            <h2 id="tituloModalAtendimento">Registrar Atendimento</h2>
+        <input type="hidden" id="modo_atendimento" value="novo">
+        <input type="hidden" id="atendimento_id">
+
+        <label>Prontuário:</label>
+        <input type="text" id="prontuario_atendimento" inputmode="numeric" required class="form-control">
+
+        <label>Nome do Paciente:</label>
+        <input type="text" id="nome_paciente_atendimento" readonly class="form-control">
+
+        <label>Data do Atendimento:</label>
+        <input type="date" id="data_atendimento" required class="form-control">
+
+        <label>Procedimentos:</label>
+        <div class="checkbox-group" id="grupo_procedimentos">
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento inicial">Acolhimento Inicial</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Acolhimento Diurno">Acolhimento Diurno</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Individual">Atendimento Individual</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento em Grupo">Atendimento em Grupo</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Atendimento Familiar">Atendimento Familiar</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Visita Domiciliar">Visita Domiciliar</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Articulação de Rede">Articulação de Rede</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Fortalecimento do Protagonismo">Fortalecimento do Protagonismo</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Corporais">Práticas Corporais</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Práticas Expressivas">Práticas Expressivas</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Atividade em Grupo">Atividade em Grupo</label>
+            <label><input type="checkbox" name="procedimentos_atendimento" value="Falta"> Falta</label>
+        </div>
+        <button type="button" id="btnSalvar" onclick="salvarAtendimento()">
+        💾 Salvar
+        </button>
+    </div>
+</div> 
+
+<!-- Modal de Novo Servidor -->
+<div class="modal fade" id="modalNovoServidor" tabindex="-1" aria-labelledby="modalNovoServidorLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalNovoServidorLabel">Pré-Cadastrar Novo Servidor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNovoServidor">
+                    <div class="mb-3">
+                        <label for="nome_novo_servidor" class="form-label">Nome Completo:</label>
+                        <input type="text" class="form-control" id="nome_novo_servidor" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cpf_novo_servidor" class="form-label">CPF:</label>
+                        <input type="text" class="form-control" id="cpf_novo_servidor" placeholder="000.000.000-00" maxlength="14" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cbo_novo_servidor" class="form-label">CBO / Cargo:</label>
+                        <input type="text" class="form-control" id="cbo_novo_servidor" value="Assistente em Administração" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="salvarServidorAutorizado()">💾 Salvar Pré-Cadastro</button>
+            </div>
+        </div>
+    </div>
+</div>
+    
+          
+          
+        
+     
+
+    

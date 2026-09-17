@@ -1,6 +1,5 @@
 import os
 import re
-import calendar
 from datetime import datetime, timedelta, date
 
 from flask import Flask, jsonify, redirect, render_template, request, session, send_file, flash, url_for
@@ -14,6 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from docxtpl import DocxTemplate
 import io
+import sqlite3
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -103,7 +103,7 @@ class TelefonePaciente(db.Model):
 
 # NOVA TABELA: Carga e dados oficiais pré-existentes dos Servidores
 class BaseServidores(db.Model):
-    __tablename__ = 'base_servidores'
+    __tablename__ = 'servidores_autorizados'
 
     id = db.Column(db.Integer, primary_key=True)
     cpf = db.Column(db.String(14), unique=True, nullable=False, index=True)
@@ -122,25 +122,10 @@ class Servidor(db.Model):
     email = db.Column(db.String(100), nullable=False)
     senha = db.Column(db.String(255), nullable=False)
     foto_perfil = db.Column(db.String(255))
-    regime = db.Column(db.String(20), default="plantonista") 
     confirmado = db.Column(db.Boolean, default=False, nullable=False)  # NOVO CAMPO
-    possui_agenda = db.Column(db.Boolean, default=False, nullable=False)
-    
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
-
-class SolicitacaoCBO(db.Model):
-    __tablename__ = 'solicitacoes_cbo'
-
-    id = db.Column(db.Integer, primary_key=True)
-    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
-    cbo_atual = db.Column(db.String(20), nullable=False)
-    cbo_solicitado = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='pendente', nullable=False)
-    aprovado_por = db.Column(db.Integer, db.ForeignKey('servidores.id'))
-    criado_em = db.Column(db.DateTime, default=func.current_timestamp())
-    analisado_em = db.Column(db.DateTime)
 
 
 class Atendimento(db.Model):
@@ -158,85 +143,19 @@ class Atendimento(db.Model):
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
 
 
-class ConsultaFutura(db.Model):
-    __tablename__ = 'consultas_futuras'
 
-    id = db.Column(db.Integer, primary_key=True)
-    atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
-    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'))
-    data = db.Column(db.String(10))
-    hora = db.Column(db.String(5))
-    profissional = db.Column(db.String(100))
-
-class PactuacaoGrupo(db.Model):
-    __tablename__ = 'pactuacoes_grupos'
-
-    id = db.Column(db.Integer, primary_key=True)
-    atendimento_id = db.Column(db.Integer, db.ForeignKey('atendimentos.id', ondelete='CASCADE'), nullable=False)
-    tipo = db.Column(db.String(50)) 
-    data_inicio = db.Column(db.String(10))
-    data_fim = db.Column(db.String(10))
-    dias_semana = db.Column(db.String(100)) 
-
-
-class Escala(db.Model):
-    __tablename__ = 'escalas'
-
-    id = db.Column(db.Integer, primary_key=True)
-    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
-    dia = db.Column(db.Integer, nullable=False)
-    mes = db.Column(db.Integer, nullable=False)
-    ano = db.Column(db.Integer, nullable=False)
-    turno = db.Column(db.String(5), nullable=False)
-
-class Afastamento(db.Model):
-    __tablename__ = 'afastamentos'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    
-    # SE O SEU __tablename__ na classe Servidor for 'servidores':
-    servidor_id = db.Column(db.Integer, db.ForeignKey('servidores.id'), nullable=False)
-    
-    # SE O SEU __tablename__ na classe Servidor for 'Servidor' (com S maiúsculo):
-    # servidor_id = db.Column(db.Integer, db.ForeignKey('Servidor.id'), nullable=False)
-
-    tipo = db.Column(db.String(50), nullable=False)
-    data_inicio = db.Column(db.Date, nullable=False)
-    data_fim = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(20), default='Pendente')
-    
-    servidor = db.relationship('Servidor', backref=db.backref('afastamentos', lazy=True))
 
 
 with app.app_context():
     db.create_all()
-    colunas_consultas = [coluna['name'] for coluna in inspect(db.engine).get_columns('consultas_futuras')]
-    if 'servidor_id' not in colunas_consultas:
-        with db.engine.connect() as conexao:
-            conexao.exec_driver_sql('ALTER TABLE consultas_futuras ADD COLUMN servidor_id INTEGER')
-            conexao.commit()
 
 
 # ==========================================
 # CONFIGURAÇÕES E AUXILIARES
 # ==========================================
 
-CBO_OPCOES = {
-    "411010": "Assistente em Administracao",
-    "251605": "Assistente Social",
-    "322230": "Auxiliar em Enfermagem",
-    "223405": "Farmaceutico",
-    "223505": "Enfermeiro",
-    "224140": "Profissional de Educacao Fisica",
-    "251510": "Psicologo Clinico",
-    "223905": "Terapeuta Ocupacional",
-    "322205": "Tecnico em Enfermagem",
-    "225125": "Medico Clinico",
-    "225133": "Medico Psiquiatra",
-    "223710": "Nutricionista",
-}
 
-CBOS_MEDICOS = {'225125', '225133'}
+
 
 
 
@@ -252,86 +171,18 @@ def servidor_logado():
     return db.session.get(Servidor, session['usuario_id'])
 
 
+@app.context_processor
 def contexto_usuario():
-    servidor = servidor_logado()
+    # Tenta buscar o objeto completo do servidor logado (se houver ID na sessão)
+    servidor_id = session.get('usuario_id')
+    servidor = Servidor.query.get(servidor_id) if servidor_id else None
+    
     return {
         'usuario': session.get('usuario'),
         'usuario_foto': session.get('usuario_foto'),
         'servidor': servidor,
-        'cbo_opcoes': CBO_OPCOES,
+        'usuario_cbo': session.get('usuario_cbo'),
     }
-
-# NOVA FUNÇÃO AUXILIAR: Envio do token por e-mail
-# MODIFICADO: Envio do token com logs para o terminal
-def parse_data_agendamento(valor):
-    if not valor:
-        return None
-
-    for formato in ('%Y-%m-%d', '%d/%m/%Y'):
-        try:
-            return datetime.strptime(valor, formato).date()
-        except ValueError:
-            pass
-    return None
-
-def data_banco_agendamento(valor):
-    data_obj = parse_data_agendamento(valor)
-    if not data_obj:
-        return valor
-    return data_obj.strftime('%Y-%m-%d')
-
-def disponibilidade_profissional(servidor_id, data_valor):
-    data_obj = parse_data_agendamento(data_valor)
-    avisos = []
-
-    if not servidor_id:
-        return {"bloqueado": True, "mensagens": ["Selecione o profissional do retorno."]}
-
-    servidor = db.session.get(Servidor, servidor_id)
-    if not servidor:
-        return {"bloqueado": True, "mensagens": ["Profissional nao encontrado."]}
-
-    if not servidor.confirmado or not servidor.possui_agenda:
-        return {
-            "bloqueado": True,
-            "mensagens": [f"{servidor.nome} nao esta com agenda ativa no sistema."]
-        }
-
-    if not data_obj:
-        return {"bloqueado": True, "mensagens": ["Data da consulta invalida."]}
-
-    afastamentos = Afastamento.query.filter(
-        Afastamento.servidor_id == servidor.id,
-        Afastamento.data_inicio <= data_obj,
-        Afastamento.data_fim >= data_obj
-    ).all()
-
-    for afastamento in afastamentos:
-        periodo = f"{afastamento.data_inicio.strftime('%d/%m/%Y')} a {afastamento.data_fim.strftime('%d/%m/%Y')}"
-        status = (afastamento.status or '').lower()
-        mensagem = f"{servidor.nome} tem {afastamento.tipo} {status} no periodo de {periodo}."
-        if status == 'autorizado':
-            return {"bloqueado": True, "mensagens": [mensagem]}
-        if status == 'pendente':
-            avisos.append(mensagem)
-
-    turno = Escala.query.filter_by(
-        servidor_id=servidor.id,
-        dia=data_obj.day,
-        mes=data_obj.month,
-        ano=data_obj.year
-    ).first()
-
-    if turno and (turno.turno or '').strip().upper() in {'-', 'F', 'FE', 'A', 'L'}:
-        return {
-            "bloqueado": True,
-            "mensagens": [f"{servidor.nome} esta bloqueado na escala deste dia."]
-        }
-
-    if not turno:
-        avisos.append(f"{servidor.nome} ainda nao tem escala configurada para este dia.")
-
-    return {"bloqueado": False, "mensagens": avisos}
 
 def enviar_email_confirmacao(usuario_email, usuario_nome):
     print(f"📬 [MAILPIT] Iniciando montagem do e-mail para: {usuario_email}")
@@ -442,6 +293,58 @@ def pacientes():
     contexto['pacientes'] = lista_pacientes
     return render_template('pacientes.html', **contexto)
 
+@app.route('/gerenciar_servidores')
+def gerenciar_servidores():
+    # Consulta todos os servidores usando o SQLAlchemy
+    servidores = BaseServidores.query.all()
+    return render_template('servidores.html', servidores=servidores)
+
+@app.route('/cadastrar_servidor_autorizado', methods=['POST'])
+def cadastrar_servidor_autorizado():
+    try:
+        dados = request.get_json()
+        cpf = dados.get('cpf', '').strip()
+        nome = dados.get('nome', '').strip()
+        cbo = dados.get('cbo', '').strip()
+
+        if not cpf or not nome:
+            return jsonify({'mensagem': 'CPF e Nome são obrigatórios.'}), 400
+
+        # Verifica se o CPF já existe
+        existente = BaseServidores.query.filter_by(cpf=cpf).first()
+        if existente:
+            return jsonify({'mensagem': 'Este CPF já possui um pré-cadastro no sistema.'}), 400
+
+        # Cria o novo objeto usando o modelo
+        novo_servidor = BaseServidores(cpf=cpf, nome=nome, cbo=cbo)
+        db.session.add(novo_servidor)
+        db.session.commit()
+
+        return jsonify({
+            'sucesso': True, 
+            'mensagem': 'Servidor pré-cadastrado com sucesso!'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao pré-cadastrar servidor: {str(e)}")
+        return jsonify({
+            'sucesso': False, 
+            'mensagem': f'Erro interno ao salvar: {str(e)}'
+        }), 500
+
+@app.route('/excluir_servidor/<int:id>', methods=['POST'])
+def excluir_servidor(id):
+    try:
+        servidor = BaseServidores.query.get_or_404(id)
+        db.session.delete(servidor)
+        db.session.commit()
+        
+        return jsonify({'sucesso': True, 'mensagem': 'Servidor removido com sucesso!'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao excluir servidor: {str(e)}")
+        return jsonify({'sucesso': False, 'mensagem': f'Erro ao excluir: {str(e)}'}), 500
 
 @app.route('/novo_paciente', methods=['POST'])
 def novo_paciente():
@@ -499,7 +402,7 @@ def novo_paciente():
 
 @app.route('/cadastro')
 def cadastro():
-    return render_template('cadastro.html', cbo_opcoes=CBO_OPCOES)
+    return render_template('cadastro.html')
 
 
 # =====================================================================
@@ -650,121 +553,66 @@ def atendimentos():
      .order_by(Atendimento.data_atendimento.desc(), Atendimento.id.desc()).all()
 
     prontuarios_atendidos = len({atend.prontuario for atend in lista_atendimentos})
-
-    # NOVA BUSCA: Filtrando apenas os profissionais de saúde que estão com a agenda ativa no sistema
-    profissionais_habilitados = Servidor.query.filter_by(confirmado=True, possui_agenda=True).order_by(Servidor.nome).all()
+    
 
     contexto = contexto_usuario()
     contexto['atendimentos'] = lista_atendimentos
     contexto['prontuarios_atendidos'] = prontuarios_atendidos
-    contexto['profissionais_habilitados'] = profissionais_habilitados  # <--- Injetado no contexto
     
     return render_template('atendimentos.html', **contexto) # (Garanta que o nome do arquivo seja exatamente o seu, atendimentos.html ou atendimento.html)
 
 
 @app.route('/novo_atendimento', methods=['POST'])
 def novo_atendimento():
-    if 'usuario' not in session:
-        return jsonify({'erro': 'Usuario nao autenticado'}), 401
+    try:
+        # Pega os dados JSON enviados pelo Fetch do JavaScript
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({'mensagem': 'Nenhum dado foi enviado.'}), 400
 
-    dados = request.get_json()
-    if not dados:
-        return jsonify({'erro': 'Dados não enviados corretamente'}), 400
+        # Extraindo os campos principais
+        prontuario = dados.get('prontuario')
+        data_atendimento = dados.get('data_atendimento')
+        procedimentos = dados.get('procedimentos', []) # Vem como uma lista de strings
 
-    prontuario = dados.get('prontuario', '').strip()
-    if not prontuario:
-        return jsonify({'erro': 'Informe o prontuario do paciente'}), 400
-
-    paciente = Paciente.query.filter(func.ltrim(Paciente.prontuario, '0') == prontuario.lstrip('0')).first()
-    if not paciente:
-        return jsonify({'erro': 'Paciente nao encontrado'}), 404
-
-    novo = Atendimento(
-        prontuario=paciente.prontuario,
-        data_atendimento=dados.get('data_atendimento'),
-        profissional=session.get('usuario'),
-        procedimentos=dados.get('procedimentos'),
-        acolhimento_24h=dados.get('acolhimento_24h'),
-        paciente_aceitou=dados.get('paciente_aceitou'),
-        observacoes=dados.get('observacoes'),
-        servidor_id=session.get('usuario_id')
-    )
-    
-    db.session.add(novo)
-    db.session.flush() 
-
-    datas_con = dados.get('data_proxima_consulta', [])
-    horas_con = dados.get('hora_proxima_consulta', [])
-    prof_con = dados.get('profissional_proxima_consulta', [])
-    avisos_agendamento = []
-
-    for i in range(len(datas_con)):
-        if datas_con[i]: 
-            servidor_destino = None
-            profissional_valor = prof_con[i] if i < len(prof_con) else ''
-            if str(profissional_valor).isdigit():
-                servidor_destino = db.session.get(Servidor, int(profissional_valor))
-            elif profissional_valor:
-                servidor_destino = Servidor.query.filter_by(nome=profissional_valor).first()
-
-            if not servidor_destino:
-                db.session.rollback()
-                return jsonify({'erro': 'Selecione um profissional valido para a consulta futura'}), 400
-
-            disponibilidade = disponibilidade_profissional(servidor_destino.id, datas_con[i])
-            if disponibilidade['bloqueado']:
-                db.session.rollback()
-                return jsonify({'erro': ' '.join(disponibilidade['mensagens'])}), 409
-
-            avisos_agendamento.extend(disponibilidade['mensagens'])
-
-            data_consulta = data_banco_agendamento(datas_con[i])
-            hora_consulta = horas_con[i] if i < len(horas_con) else ''
-            if hora_consulta:
-                conflito = ConsultaFutura.query.filter_by(
-                    servidor_id=servidor_destino.id,
-                    data=data_consulta,
-                    hora=hora_consulta
-                ).first()
-                if conflito:
-                    db.session.rollback()
-                    return jsonify({'erro': 'Este horario ja esta ocupado na agenda do profissional.'}), 409
-
-            nova_con = ConsultaFutura(
-                atendimento_id=novo.id,
-                servidor_id=servidor_destino.id,
-                data=data_consulta,
-                hora=hora_consulta,
-                profissional=servidor_destino.nome
-            )
-            db.session.add(nova_con)
-
-    tipos_pac = dados.get('tipo_pactuacao_periodo', [])
-    dt_inicio_pac = dados.get('data_inicio_pactuacao', [])
-    dt_fim_pac = dados.get('data_fim_pactuacao', [])
-    dias_esp = dados.get('dias_semana_acolhimento', [])
-
-    for i in range(len(tipos_pac)):
-        if tipos_pac[i]:
-            tipo = tipos_pac[i]
-            dias = dias_esp[i] if (tipo == 'Acolhimento Diurno' and i < len(dias_esp)) else None
+        # Validações básicas no backend
+        if not prontuario or not data_atendimento:
+            return jsonify({'mensagem': 'Prontuário e Data do Atendimento são obrigatórios.'}), 400
             
-            nova_pac = PactuacaoGrupo(
-                atendimento_id=novo.id,
-                tipo=tipo,
-                data_inicio=dt_inicio_pac[i] if i < len(dt_inicio_pac) else '',
-                data_fim=dt_fim_pac[i] if i < len(dt_fim_pac) else '',
-                dias_semana=dias
-            )
-            db.session.add(nova_pac)
+        if not procedimentos or len(procedimentos) == 0:
+            return jsonify({'mensagem': 'Selecione pelo menos um procedimento.'}), 400
 
-    db.session.commit() 
-    return jsonify({
-        'mensagem': 'Atendimento e pactuacoes cadastrados com sucesso!',
-        'avisos': avisos_agendamento
-    })
+        # Transforma a lista de procedimentos em uma string separada por vírgula para salvar no banco
+        procedimentos_str = ", ".join(procedimentos)
 
+        # -------------------------------------------------------------
+        # SALVANDO DE FATO NO BANCO DE DADOS (SQLite)
+        # -------------------------------------------------------------
+        conexao = sqlite3.connect('seu_banco.db') # Substitua pelo nome do seu arquivo de banco de dados
+        cursor = conexao.cursor()
+        
+        cursor.execute("""
+            INSERT INTO atendimentos (prontuario, data_atendimento, procedimentos) 
+            VALUES (?, ?, ?)
+        """, (prontuario, data_atendimento, procedimentos_str))
+        
+        conexao.commit()
+        conexao.close()
+        # -------------------------------------------------------------
 
+        return jsonify({
+            'sucesso': True, 
+            'mensagem': 'Atendimento registrado com sucesso!'
+        }), 200
+
+    except Exception as e:
+        print(f"Erro ao registrar atendimento: {str(e)}")
+        return jsonify({
+            'sucesso': False, 
+            'mensagem': f'Erro interno ao salvar: {str(e)}'
+        }), 500
+    
 @app.route('/atualizar_atendimento', methods=['POST'])
 def atualizar_atendimento():
     if 'usuario' not in session:
@@ -828,19 +676,6 @@ def atualizar_perfil():
     servidor.email = email
     servidor.cnes = cnes
 
-    if cbo_solicitado and cbo_solicitado != servidor.cbo:
-        pendente = SolicitacaoCBO.query.filter_by(servidor_id=servidor.id, status='pendente').first()
-        if pendente:
-            pendente.cbo_atual = servidor.cbo
-            pendente.cbo_solicitado = cbo_solicitado
-            pendente.criado_em = func.current_timestamp()
-        else:
-            nova_solicitacao = SolicitacaoCBO(
-                servidor_id=servidor.id,
-                cbo_atual=servidor.cbo,
-                cbo_solicitado=cbo_solicitado
-            )
-            db.session.add(nova_solicitacao)
 
     db.session.commit()
 
@@ -904,411 +739,7 @@ def buscar_paciente():
 
     return jsonify({"erro": "Paciente nao encontrado"}), 404
 
-@app.route('/agendas')
-def agendas():
-    if 'usuario' not in session:
-        return redirect('/')
 
-    # CORREÇÃO: Buscando pelo Nome do servidor, que é o que está na sua sessão
-    usuario_logado = Servidor.query.filter_by(nome=session['usuario']).first()
-    
-    # Proteção: Se mesmo assim não achar o usuário no banco, desloga ou nega o admin
-    if not usuario_logado:
-        eh_administrador = False
-    else:
-        eh_administrador = (usuario_logado.cbo == '411010')
-
-    # Resto do código continua igual...
-    servidores_com_agenda = Servidor.query.filter_by(confirmado=True, possui_agenda=True).all()
-
-    todos_profissionais = []
-    if eh_administrador:
-        todos_profissionais = Servidor.query.filter(
-            Servidor.confirmado == True, 
-            Servidor.cbo != '411010'
-        ).all()
-
-    contexto = contexto_usuario()
-    contexto['servidores'] = servidores_com_agenda
-    contexto['todos_profissionais'] = todos_profissionais
-    contexto['eh_administrador'] = eh_administrador
-    
-    return render_template('agendas.html', **contexto)
-
-@app.route('/api/servidor/configurar-agenda', methods=['POST'])
-def configurar_agenda():
-    if 'usuario' not in session:
-        return jsonify({"erro": "Não autorizado"}), 401
-        
-    data = request.json
-    servidor_id = data.get('servidor_id')
-    status_agenda = data.get('possui_agenda') # True ou False
-
-    servidor = Servidor.query.get(servidor_id)
-    if not servidor:
-        return jsonify({"erro": "Servidor não encontrado"}), 404
-
-    servidor.possui_agenda = status_agenda
-    db.session.commit()
-
-    return jsonify({"sucesso": True, "mensagem": f"Agenda de {servidor.nome} atualizada!"})
-
-@app.route('/api/agenda/pacientes', methods=['GET'])
-def buscar_pacientes_do_dia():
-    servidor_id = request.args.get('servidor_id')
-    data_selecionada = request.args.get('data') # Recebe YYYY-MM-DD do input html
-    
-    if not servidor_id or not data_selecionada:
-        return jsonify({"erro": "Parâmetros ausentes"}), 400
-
-    servidor = db.session.get(Servidor, int(servidor_id)) if str(servidor_id).isdigit() else None
-    if not servidor:
-        return jsonify({"erro": "Profissional nao encontrado"}), 404
-
-    data_objeto = parse_data_agendamento(data_selecionada)
-    data_iso = data_objeto.strftime('%Y-%m-%d') if data_objeto else data_selecionada
-    data_br = data_objeto.strftime('%d/%m/%Y') if data_objeto else data_selecionada
-
-    # Realiza a busca usando o formato idêntico ao do seu banco de dados
-    consultas = db.session.query(ConsultaFutura, Paciente).\
-        join(Atendimento, ConsultaFutura.atendimento_id == Atendimento.id).\
-        join(Paciente, Atendimento.prontuario == Paciente.prontuario).\
-        filter(
-            (ConsultaFutura.servidor_id == servidor.id) |
-            ((ConsultaFutura.servidor_id == None) & (ConsultaFutura.profissional == servidor.nome))
-        ).\
-        filter(ConsultaFutura.data.in_([data_iso, data_br])).\
-        order_by(ConsultaFutura.hora).all()
-        
-    resultado = []
-    for consulta, paciente in consultas:
-        resultado.append({
-            "hora": consulta.hora,
-            "prontuario": paciente.prontuario,
-            "paciente_nome": paciente.nome_social if paciente.nome_social else paciente.nome_paciente
-        })
-        
-    return jsonify(resultado) # Se não houver ninguém, retorna [], o que é correto!
-
-@app.route('/api/profissional/disponibilidade', methods=['GET'])
-def verificar_disponibilidade_profissional():
-    if 'usuario' not in session:
-        return jsonify({"erro": "Usuario nao autenticado"}), 401
-
-    servidor_id = request.args.get('servidor_id', type=int)
-    data_selecionada = request.args.get('data')
-    disponibilidade = disponibilidade_profissional(servidor_id, data_selecionada)
-    status = 409 if disponibilidade['bloqueado'] else 200
-    return jsonify(disponibilidade), status
-
-@app.route('/servidores')
-def servidores():
-    if 'usuario' not in session:
-        return redirect('/')
-
-    agora = datetime.now()
-    ano = request.args.get('ano', agora.year, type=int)
-    mes = request.args.get('mes', agora.month, type=int)
-    
-    _, ultimo_dia = calendar.monthrange(ano, mes)
-    dias_da_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-    
-    lista_dias = []
-    for dia in range(1, ultimo_dia + 1):
-        dia_semana_num = datetime(ano, mes, dia).weekday()
-        lista_dias.append({
-            "numero": dia, 
-            "nome_semana": dias_da_semana[dia_semana_num],
-            "is_util": dia_semana_num < 5
-        })
-        
-    todos_servidores = Servidor.query.filter(Servidor.cbo.in_(CBO_OPCOES.keys())).all()
-    
-    # 1. BUSCA AFASTAMENTOS QUE REBATEM NO MÊS/ANO VISUALIZADO
-    primeiro_dia_mes = date(ano, mes, 1)
-    ultimo_dia_mes = date(ano, mes, ultimo_dia)
-    
-    afastamentos_mes = Afastamento.query.filter(
-        Afastamento.data_inicio <= ultimo_dia_mes,
-        Afastamento.data_fim >= primeiro_dia_mes,
-        Afastamento.status == 'Autorizado'
-    ).all()
-    
-    turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
-    mapa_escala = {(t.servidor_id, t.dia): t.turno for t in turnos_salvos}
-
-    escala_por_cargo = {}
-    for s in todos_servidores:
-        nome_aba = CBO_OPCOES.get(s.cbo, "outros")
-        if nome_aba not in escala_por_cargo:
-            escala_por_cargo[nome_aba] = []
-            
-        # Filtra os afastamentos deste servidor específico neste mês
-        afastamentos_servidor = [a for a in afastamentos_mes if a.servidor_id == s.id]
-        
-        turnos_mes = []
-        for d in lista_dias:
-            dia_num = d['numero']
-            data_corrente = date(ano, mes, dia_num)
-            
-            # 2. VERIFICA SE O SERVIDOR ESTÁ AFASTADO NESSE DIA
-            afastamento_ativo = None
-            for afast in \
-                    afastamentos_servidor:
-                if afast.data_inicio <= data_corrente <= \
-                        afast.data_fim:
-                    afastamento_ativo = afast
-                    break
-            
-            if afastamento_ativo:
-                # Aplica a sigla correspondente do afastamento
-                if 'férias' in afastamento_ativo.tipo.lower():
-                    turno_dia = 'F'
-                elif 'licença' in \
-                        afastamento_ativo.tipo.lower():
-                    turno_dia = 'LM'
-                else:
-                    turno_dia = 'F'  # Folga/Afastamento padrão
-            else:
-                # 3. SE NÃO HOUVER AFASTAMENTO, SEGUE A LOGA NORMAL DE TURNOS
-                turno_dia = mapa_escala.get((s.id, dia_num))
-                
-                if turno_dia is None:
-                    if s.cbo in CBOS_MEDICOS:
-                        # Fallback dinâmico para os novos regimes de médicos diaristas
-                        if d['is_util'] and s.regime in ['m', 't', 'mt', 'i']:
-                            turno_dia = s.regime.upper()
-                        elif d['is_util'] and (s.regime == 'plantonista' or not s.regime):
-                            turno_dia = '-'  # Plantonista começa vazio na semana
-                        else:
-                            turno_dia = '-'
-                    elif d['is_util'] and s.regime in ['diarista_40h', 'diarista_integral', 'mt']:
-                        turno_dia = 'MT'
-                    elif d['is_util'] and s.regime in ['diarista_manha', 'm']:
-                        turno_dia = 'M'
-                    elif d['is_util'] and s.regime in ['diarista_tarde', 't']:
-                        turno_dia = 'T'
-                    elif d['is_util'] and s.regime in ['diarista_intermediario', 'i']:
-                        turno_dia = 'I'
-                    else:
-                        turno_dia = '-'
-                        
-            turnos_mes.append(turno_dia)
-
-        escala_por_cargo[nome_aba].append({
-            "id": s.id,
-            "nome": s.nome,  
-            "turnos": turnos_mes 
-        })
-        
-    meses_ano = [
-        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
-        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
-    ]
-
-    contexto = contexto_usuario()
-    contexto.update({
-        'escala_por_cargo': escala_por_cargo,
-        'lista_dias': lista_dias,
-        'mes_atual': mes,
-        'ano_atual': ano,
-        'meses_ano': meses_ano,
-        'cargo_usuario': session.get('usuario_cbo'),
-        'servidores_lista': todos_servidores  # <-- ADICIONE ESSA LINHA AQUI
-    })
-    return render_template('servidores.html', **contexto)
-
-@app.context_processor
-def injetar_servidores():
-    # Substitua pela forma como você busca os servidores no seu banco de dados
-    # Exemplo se usar SQLAlchemy: servidores = Servidor.query.all()
-    # Exemplo se usar banco normal: servidores = buscar_todos_servidores_do_banco()
-    
-    servidores = Servidor.query.order_by(Servidor.nome).all() 
-    
-    # O nome da chave aqui deve ser EXATAMENTE o que está no seu loop do modal
-    return dict(servidores_lista=servidores)
-
-
-@app.route('/configurar-escala', methods=['GET', 'POST'])
-def configurar_escala():
-    if 'usuario' not in session or session.get('usuario_cbo') != '411010':
-        return redirect('/')
-
-    agora = datetime.now()
-    mes = request.args.get('mes', agora.month, type=int)
-    ano = request.args.get('ano', agora.year, type=int)
-
-    if request.method == 'POST':
-        dados = request.form
-        mes_salvar = int(dados.get('mes'))
-        ano_salvar = int(dados.get('ano'))
-
-        for chave, valor in dados.items():
-            if chave.startswith('regime_'):
-                servidor_id = int(chave.split('_')[1])
-                servidor = db.session.get(Servidor, servidor_id)
-                if servidor:  # <-- CORRIGIDO: Agora salva o regime para TODOS, incluindo médicos
-                    servidor.regime = valor
-
-        for chave, valor in dados.items():
-            if chave.startswith('turno_'):
-                partes = chave.split('_')
-                servidor_id = int(partes[1])
-                dia_num = int(partes[2])
-
-                registro_existente = Escala.query.filter_by(
-                    servidor_id=servidor_id, dia=dia_num, mes=mes_salvar, ano=ano_salvar
-                ).first()
-
-                if registro_existente:
-                    registro_existente.turno = valor
-                else:
-                    novo_turn = Escala(
-                        servidor_id=servidor_id, dia=dia_num, mes=mes_salvar, ano=ano_salvar, turno=valor
-                    )
-                    db.session.add(novo_turn)
-
-        db.session.commit()
-        flash('Escala salva com sucesso!', 'success')
-        return redirect(url_for('servidores', mes=mes, ano=ano))
-
-    _, ultimo_dia = calendar.monthrange(ano, mes)
-    dias_da_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-    
-    lista_dias = []
-    for dia in range(1, ultimo_dia + 1):
-        dia_semana_num = datetime(ano, mes, dia).weekday()
-        lista_dias.append({"numero": dia, "nome_semana": dias_da_semana[dia_semana_num], "is_util": dia_semana_num < 5})
-
-    todos_servidores = Servidor.query.filter(Servidor.cbo.in_(CBO_OPCOES.keys())).all()
-    turnos_salvos = Escala.query.filter_by(mes=mes, ano=ano).all()
-
-    escala_por_cargo = {}
-    for s in todos_servidores:
-        nome_aba = CBO_OPCOES.get(s.cbo, "outros")
-        if nome_aba not in escala_por_cargo:
-            escala_por_cargo[nome_aba] = []
-            
-        servidor_dados = {
-            "id": s.id,
-            "nome": s.nome,  
-            "cbo": s.cbo,
-            "regime": s.regime,
-            "turnos_existentes": {t.dia: t.turno for t in turnos_salvos if t.servidor_id == s.id}
-        }
-        escala_por_cargo[nome_aba].append(servidor_dados)
-
-    meses_ano = [
-        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
-        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
-    ]
-
-    afastamentos_lista = Afastamento.query.order_by(Afastamento.data_inicio.desc()).all()
-    afastamentos_pendentes = [a for a in afastamentos_lista if a.status == 'Pendente']
-    afastamentos_definitivos = [a for a in afastamentos_lista if a.status == 'Autorizado']
-
-    contexto = contexto_usuario()
-    contexto.update({
-        'escala_por_cargo': escala_por_cargo,
-        'lista_dias': lista_dias,
-        'mes_config': mes,
-        'ano_config': ano,
-        'afastamentos_lista': afastamentos_lista,
-        'afastamentos_pendentes': afastamentos_pendentes,
-        'afastamentos_definitivos': afastamentos_definitivos,
-        'meses_ano': meses_ano
-    })
-    return render_template('configurar_escala.html', **contexto)
-
-
-@app.route('/cadastrar-afastamento', methods=['POST'])
-def cadastrar_afastamento():
-    if 'usuario' not in session or session.get('usuario_cbo') != '411010':
-        return redirect('/')
-
-    servidor_id = request.form.get('servidor_id', type=int)
-    tipo = request.form.get('tipo')
-    data_inicio_str = request.form.get('data_inicio')
-    data_fim_str = request.form.get('data_fim')
-
-    if not servidor_id or not tipo or not data_inicio_str or not data_fim_str:
-        flash('Todos os campos são obrigatórios!', 'danger')
-        return redirect(url_for('servidores'))
-
-    try:
-        # Converte as strings de data que vêm do HTML (formato YYYY-MM-DD) para objetos date do Python
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-
-        if data_fim < data_inicio:
-            flash('A data de fim não pode ser menor que a data de início!', 'danger')
-            return redirect(url_for('servidores'))
-
-        # Cria o registro do afastamento
-        novo_afastamento = Afastamento(
-            servidor_id=servidor_id,
-            tipo=tipo,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            status='Pendente'
-        )
-        
-        db.session.add(novo_afastamento)
-        db.session.commit()
-        flash('Afastamento cadastrado com sucesso!', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Erro ao cadastrar afastamento: {str(e)}', 'danger')
-
-    # Retorna para a mesma página mantendo o mês e ano visualizados
-    mes = request.form.get('mes_retorno', datetime.now().month, type=int)
-    ano = request.form.get('ano_retorno', datetime.now().year, type=int)
-    return redirect(url_for('servidores', mes=mes, ano=ano))
-
-# 1. ROTA PARA AUTORIZAR O AFASTAMENTO
-@app.route('/autorizar_afastamento/<int:id>', methods=['POST'])
-def autorizar_afastamento(id):
-    afastamento = Afastamento.query.get_or_404(id)
-    afastamento.status = 'Autorizado'
-    
-    # [DICA]: Se você quiser que o "F" apareça automaticamente na tabela ao autorizar,
-    # você pode varrer os dias entre afastamento.data_inicio e data_fim aqui 
-    # e salvar o turno deles como 'F' no banco de dados.
-    
-    db.session.commit()
-    flash('Afastamento autorizado com sucesso!', 'success')
-    return redirect(request.referrer) # Volta para a página onde o gestor estava
-
-# 2. ROTA PARA EDITAR OS DIAS DO AFASTAMENTO
-@app.route('/editar_afastamento/<int:id>', methods=['POST'])
-def editar_afastamento(id):
-    afastamento = Afastamento.query.get_or_404(id)
-    
-    # Coleta as novas datas enviadas pelo modal de edição
-    data_inicio_str = request.form.get('data_inicio')
-    data_fim_str = request.form.get('data_fim')
-    
-    # Converte strings do input date para objetos date do Python
-    from datetime import datetime
-    afastamento.data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-    afastamento.data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-    
-    db.session.commit()
-    flash('Período de afastamento atualizado!', 'success')
-    return redirect(request.referrer)
-
-# 3. ROTA PARA CANCELAR / DELETAR O AFASTAMENTO
-@app.route('/cancelar_afastamento/<int:id>', methods=['POST'])
-def cancelar_afastamento(id):
-    afastamento = Afastamento.query.get_or_404(id)
-    
-    db.session.delete(afastamento)
-    db.session.commit()
-    
-    flash('Afastamento cancelado e removido do sistema.', 'warning')
-    return redirect(request.referrer)
 
 
 if __name__ == '__main__':

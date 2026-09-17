@@ -7,6 +7,14 @@ body {
     margin: 0;
 }
 
+.modal {
+    z-index: 1055 !important;
+    }
+.modal-backdrop {
+    z-index: 1050 !important;
+    }
+
+
 body > form {
     width: min(92vw, 420px);
     margin: 20px 0;

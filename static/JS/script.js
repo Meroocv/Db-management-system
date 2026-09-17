@@ -33,6 +33,17 @@ function toggleSidebar() {
   document.body.classList.toggle('sidebar-expanded');
 }
 
+function setValue(id, value) {
+    let el = document.getElementById(id);
+    if (el) {
+      // Se o valor for null, undefined, ou a string "none"/"null", limpa o campo
+      if (value === null || value === undefined || value === "none" || value === "null") {
+        el.value = "";
+      } else {
+        el.value = value;
+      }
+    }
+  }
 // ==========================================
 // MÓDULO: INTERFACE E GRID DOS MODAIS
 // ==========================================
@@ -169,38 +180,76 @@ function abrirPaciente(btn, modo) {
         dadosTelefonesRaw = dadosTelefonesRaw.replace(/\r?\n|\r/g, " ").trim();
         const listaTelefones = JSON.parse(dadosTelefonesRaw);
         
+        // Se houver telefones cadastrados, exibe todos eles
         if (Array.isArray(listaTelefones) && listaTelefones.length > 0) {
           listaTelefones.forEach(tel => adicionarTelefone(tel));
-        } else if (['edit', 'novo', 'new'].includes(modo)) {
-          adicionarTelefone(); 
         }
+        // *Nota: Removemos o else/else if que chamava o adicionarTelefone() sozinho.*
+        
       } catch (e) {
         console.error("Erro ao analisar a string JSON de telefones:", e);
-        if (['edit', 'novo', 'new'].includes(modo)) adicionarTelefone();
       }
-    } else if (['edit', 'novo', 'new'].includes(modo)) {
-      adicionarTelefone();
     }
+  
   }
 }
 
+function adicionarTelefone(telData = {}) {
+  const container = document.getElementById('container-telefones');
+  if (!container) return;
+
+  const div = document.createElement('div');
+  div.classList.add('linha-telefone', 'mb-2', 'd-flex', 'gap-2', 'align-items-center');
+
+  // Extrai os valores caso venham preenchidos (modo edição)
+  const dddVal = telData.ddd || '';
+  const numVal = telData.numero || '';
+  const tipoVal = telData.tipo || 'Paciente';
+
+  div.innerHTML = `
+    <!-- O name="ddd[]" precisa ser exatamente este -->
+    <input type="text" name="ddd[]" class="form-control" style="width: 80px;" placeholder="DDD" value="${dddVal}" maxlength="2">
+    
+    <!-- O name="numero_telefone[]" precisa ser exatamente este -->
+    <input type="text" name="numero_telefone[]" class="form-control" placeholder="Número" value="${numVal}">
+    
+    <!-- O name="tipo_telefone[]" precisa ser exatamente este -->
+    <select name="tipo_telefone[]" class="form-select" style="width: 140px;">
+      <option value="Paciente" ${tipoVal === 'Paciente' ? 'selected' : ''}>Paciente</option>
+      <option value="Responsável" ${tipoVal === 'Responsável' ? 'selected' : ''}>Responsável</option>
+      <option value="Familiar" ${tipoVal === 'Familiar' ? 'selected' : ''}>Familiar</option>
+    </select>
+
+    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.linha-telefone').remove()">X</button>
+  `;
+
+  container.appendChild(div);
+}
+
 function abrirNovoPaciente() {
+  // Limpa todos os inputs, selects e textareas do modal
   document.querySelectorAll("#modalPaciente input, #modalPaciente select, #modalPaciente textarea")
     .forEach(el => el.value = "");
 
+  // Define o prontuário como automático
   document.getElementById('prontuario').value = 'Automático';
 
+  // Configura o modo para 'novo'
   const elModo = document.getElementById("modo");
   if (elModo) elModo.value = "novo";
 
+  // Prepara o container de telefones: limpa e já adiciona 1 campo obrigatório
   const container = document.getElementById('container-telefones');
   if (container) {
       container.innerHTML = '';
-      adicionarTelefone(); 
+      adicionarTelefone(); // Cria o primeiro campo em branco obrigatoriamente
   }
 
+  // Abre o modal e define a aba inicial
   document.getElementById('modalPaciente').style.display = 'block';
   abrirAba('identificacao', document.querySelector('#modalPaciente .nav-link'));
+  
+  // Habilita os campos para edição
   setModoPaciente(true);
 }
 
@@ -270,18 +319,28 @@ function fecharModal() {
 
 function salvarEdicao() {
   let listaTelefones = [];
+  
+  // 1. Varre cada linha de telefone para extrair os dados
   document.querySelectorAll('#container-telefones .linha-telefone').forEach(linha => {
-    const ddd = linha.querySelector('input[name="ddd[]"]')?.value || '';
-    const numero = linha.querySelector('input[name="numero_telefone[]"]')?.value || '';
+    const ddd = linha.querySelector('input[name="ddd[]"]')?.value.trim() || '';
+    const numero = linha.querySelector('input[name="numero_telefone[]"]')?.value.trim() || '';
     const tipo = linha.querySelector('select[name="tipo_telefone[]"]')?.value || 'Paciente';
-    const nome_familiar = linha.querySelector('input[name="nome_familiar[]"]')?.value || '';
-    const parentesco_familiar = linha.querySelector('input[name="parentesco_familiar[]"]')?.value || '';
+    const nome_familiar = linha.querySelector('input[name="nome_familiar[]"]')?.value.trim() || '';
+    const parentesco_familiar = linha.querySelector('input[name="parentesco_familiar[]"]')?.value.trim() || '';
 
+    // Só adiciona na lista se o DDD e o número estiverem preenchidos
     if (ddd && numero) {
       listaTelefones.push({ ddd, numero, tipo, nome_familiar, parentesco_familiar });
     }
   });
 
+  // 2. VALIDAÇÃO OBRIGATÓRIA: Impede o salvamento se não houver pelo menos um telefone válido
+  if (listaTelefones.length === 0) {
+    alert("Atenção: É obrigatório cadastrar pelo menos um telefone de contato para o paciente.");
+    return; // Para a execução aqui e não envia o fetch
+  }
+
+  // 3. Monta o objeto de dados com todas as informações do formulário
   let dados = {
     prontuario: document.getElementById('prontuario').value,
     terapeuta_referencia: document.getElementById('terapeuta_referencia')?.value || '',
@@ -302,7 +361,7 @@ function salvarEdicao() {
     escolaridade: document.getElementById('escolaridade')?.value || '',
     etnia: document.getElementById('etnia')?.value || '',
     orientacao_religiosa: document.getElementById('orientacao_religiosa')?.value || '',
-    telefones: listaTelefones,
+    telefones: listaTelefones, // Vai preenchido com os telefones validados
     municipio: document.getElementById('municipio')?.value || '',
     uf: document.getElementById('uf')?.value || '',
     zona: document.getElementById('zona')?.value || '',
@@ -317,6 +376,7 @@ function salvarEdicao() {
     data_conclusao: document.getElementById('data_conclusao')?.value || ''
   };
 
+  // 4. Envia via Fetch para o backend Python (Flask)
   fetch('/atualizar_paciente', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -397,183 +457,6 @@ function toggleSecaoPactuacao(containerId, checkbox) {
       document.getElementById('lista_consultas_futuras').innerHTML = '';
     } else {
       document.getElementById('lista_grupos_futuros').innerHTML = '';
-    }
-  }
-}
-
-function adicionarLinhaConsulta() {
-    const container = document.getElementById('lista_consultas_futuras');
-    
-    // 1. Pegamos o JSON do input oculto que o HTML gerou
-    const inputJson = document.getElementById('dados_profissionais_json');
-    let profissionais = [];
-    
-    if (inputJson) {
-        try {
-            profissionais = JSON.parse(inputJson.textContent || inputJson.value || '[]');
-        } catch (e) {
-            console.error("Erro ao processar lista de profissionais", e);
-        }
-    }
-
-    // 2. Montamos as opções do select dinamicamente baseado na lista obtida
-    let opcoesMedicos = '<option value="">Selecione o profissional...</option>';
-    profissionais.forEach(prof => {
-        opcoesMedicos += `<option value="${prof.id}" data-nome="${prof.nome}">${prof.nome} (${prof.cbo})</option>`;
-    });
-
-    // 3. Criamos a linha injetando a string de opções que geramos acima
-    const linha = document.createElement('div');
-    linha.className = 'row g-2 mb-2 linha-consulta-futura';
-    
-    linha.innerHTML = `
-        <div class="col-md-3">
-            <input type="date" class="form-control consulta-data" name="data_proxima_consulta" onchange="verificarDisponibilidadeLinha(this)" required>
-        </div>
-        <div class="col-md-2">
-            <input type="time" class="form-control consulta-hora" name="hora_proxima_consulta">
-        </div>
-        <div class="col-md-5">
-            <select class="form-select consulta-professional" name="profissional_proxima_consulta" onchange="verificarDisponibilidadeLinha(this)" required>
-                ${opcoesMedicos}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="this.closest('.row').remove()">
-                Remover
-            </button>
-        </div>
-        <div class="col-12 aviso-disponibilidade small"></div>
-    `;
-    
-    container.appendChild(linha);
-}
-
-function verificarDisponibilidadeLinha(campo) {
-  const linha = campo.closest('.linha-consulta-futura');
-  if (!linha) return;
-
-  const data = linha.querySelector('.consulta-data')?.value || '';
-  const profissionalId = linha.querySelector('.consulta-professional')?.value || '';
-  const aviso = linha.querySelector('.aviso-disponibilidade');
-  const botaoSalvar = document.getElementById('btnSalvarAtendimento');
-
-  if (!aviso || !data || !profissionalId) {
-    if (aviso) aviso.innerHTML = '';
-    return;
-  }
-
-  fetch(`/api/profissional/disponibilidade?servidor_id=${profissionalId}&data=${data}`)
-    .then(async resposta => {
-      const corpo = await resposta.json();
-      aviso.innerHTML = '';
-
-      if (corpo.mensagens && corpo.mensagens.length) {
-        aviso.innerHTML = corpo.mensagens.map(msg => `<div>${msg}</div>`).join('');
-        aviso.className = `col-12 aviso-disponibilidade small ${corpo.bloqueado ? 'text-danger' : 'text-warning'}`;
-      }
-
-      linha.dataset.bloqueado = corpo.bloqueado ? 'true' : 'false';
-      if (botaoSalvar) {
-        const temBloqueio = Array.from(document.querySelectorAll('.linha-consulta-futura'))
-          .some(item => item.dataset.bloqueado === 'true');
-        botaoSalvar.disabled = temBloqueio;
-      }
-    })
-    .catch(() => {
-      aviso.innerHTML = '<div>Erro ao verificar disponibilidade.</div>';
-      aviso.className = 'col-12 aviso-disponibilidade small text-danger';
-      linha.dataset.bloqueado = 'true';
-      if (botaoSalvar) botaoSalvar.disabled = true;
-    });
-}
-
-function adicionarLinhaGrupo() {
-  const container = document.getElementById('lista_grupos_futuros');
-  if (!container) return;
-
-  const novaLinha = document.createElement('div');
-  novaLinha.className = 'linha-dinamica mb-3 p-2 border rounded bg-light'; 
-  
-  novaLinha.innerHTML = `
-    <div class="row g-2 align-items-center">
-      <div class="col-md-3">
-        <select name="tipo_pactuacao_periodo[]" required class="form-select form-control-sm" onchange="atualizarInterfaceGrupo(this)">
-          <option value="Grupo Terapeutico">Grupo Terapêutico</option>
-          <option value="Acolhimento Diurno">Acolhimento Diurno</option>
-        </select>
-      </div>
-      <div class="col-md-3"><input type="date" name="data_inicio_pactuacao[]" required class="form-control form-control-sm"></div>
-      <div class="col-md-3"><input type="date" name="data_fim_pactuacao[]" required class="form-control form-control-sm"></div>
-      <div class="col-md-3">
-        <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removerLinhaDinamica(this)">Remover</button>
-      </div>
-    </div>
-    
-    <input type="hidden" name="dias_semana_acolhimento[]" class="input-dias-string" value="">
-
-    <div class="secao-dias border-top mt-2 pt-2" style="display: none;">
-      <small class="text-muted d-block mb-1">Dias específicos da semana (Se nenhum for marcado, assume-se todos os dias):</small>
-      <div class="d-flex flex-wrap gap-3">
-        <label class="d-flex align-items-center gap-1" style="font-size: 13px; cursor:pointer; font-weight: normal;">
-          <input type="checkbox" value="Seg" onchange="atualizarDiasString(this)" style="width:15px; height:15px; margin:0;"> Seg
-        </label>
-        <label class="d-flex align-items-center gap-1" style="font-size: 13px; cursor:pointer; font-weight: normal;">
-          <input type="checkbox" value="Ter" onchange="atualizarDiasString(this)" style="width:15px; height:15px; margin:0;"> Ter
-        </label>
-        <label class="d-flex align-items-center gap-1" style="font-size: 13px; cursor:pointer; font-weight: normal;">
-          <input type="checkbox" value="Qua" onchange="atualizarDiasString(this)" style="width:15px; height:15px; margin:0;"> Qua
-        </label>
-        <label class="d-flex align-items-center gap-1" style="font-size: 13px; cursor:pointer; font-weight: normal;">
-          <input type="checkbox" value="Qui" onchange="atualizarDiasString(this)" style="width:15px; height:15px; margin:0;"> Qui
-        </label>
-        <label class="d-flex align-items-center gap-1" style="font-size: 13px; cursor:pointer; font-weight: normal;">
-          <input type="checkbox" value="Sex" onchange="atualizarDiasString(this)" style="width:15px; height:15px; margin:0;"> Sex
-        </label>
-      </div>
-    </div>
-  `;
-  container.appendChild(novaLinha);
-}
-
-function atualizarInterfaceGrupo(select) {
-  const linha = select.closest('.linha-dinamica');
-  const secaoDias = linha.querySelector('.secao-dias');
-  const hiddenInput = linha.querySelector('.input-dias-string');
-  
-  if (select.value === 'Acolhimento Diurno') {
-    secaoDias.style.display = 'block';
-  } else {
-    secaoDias.style.display = 'none';
-    hiddenInput.value = '';
-    secaoDias.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-  }
-}
-
-function atualizarDiasString(checkbox) {
-  const linha = checkbox.closest('.linha-dinamica');
-  const hiddenInput = linha.querySelector('.input-dias-string');
-  const checkboxesMarcados = linha.querySelectorAll('.secao-dias input[type="checkbox"]:checked');
-  
-  const diasArray = Array.from(checkboxesMarcados).map(cb => cb.value);
-  hiddenInput.value = diasArray.join(','); 
-}
-
-function removerLinhaDinamica(botao) {
-  const linha = botao.closest('.linha-dinamica');
-  if (!linha) return;
-  
-  const listaContainer = linha.parentElement;
-  linha.remove();
-  
-  // REGRA DE OURO: Se a lista ficou vazia, desmarca o checkbox principal e esconde o bloco
-  if (listaContainer.children.length === 0) {
-    if (listaContainer.id === 'lista_consultas_futuras') {
-      document.getElementById('marcar_consulta_futura').checked = false;
-      document.getElementById('container_consultas_lista').style.display = 'none';
-    } else if (listaContainer.id === 'lista_grupos_futuros') {
-      document.getElementById('marcar_grupo_futuro').checked = false;
-      document.getElementById('container_grupos_lista').style.display = 'none';
     }
   }
 }
@@ -674,80 +557,66 @@ function obterProcedimentosMarcados() {
 }
 
 function salvarAtendimento() {
-    if (Array.from(document.querySelectorAll('.linha-consulta-futura')).some(linha => linha.dataset.bloqueado === 'true')) {
-        alert('Existe consulta futura bloqueada por escala ou afastamento. Ajuste antes de salvar.');
-        return;
+  // 1. Coletar os valores dos campos ocultos e visíveis
+  const modo = document.getElementById('modo_atendimento')?.value || 'novo';
+  const atendimentoId = document.getElementById('atendimento_id')?.value || '';
+  const prontuario = document.getElementById('prontuario_atendimento')?.value.trim();
+  const dataAtendimento = document.getElementById('data_atendimento')?.value;
+
+  // 2. Coletar todos os procedimentos selecionados nos checkboxes
+  const procedimentosSelecionados = [];
+  document.querySelectorAll('input[name="procedimentos_atendimento"]:checked').forEach(checkbox => {
+    procedimentosSelecionados.push(checkbox.value);
+  });
+
+  // 3. Validações essenciais
+  if (!prontuario) {
+    alert("Atenção: O campo Prontuário é obrigatório.");
+    document.getElementById('prontuario_atendimento').focus();
+    return;
+  }
+
+  if (!dataAtendimento) {
+    alert("Atenção: Selecione a data do atendimento.");
+    document.getElementById('data_atendimento').focus();
+    return;
+  }
+
+  if (procedimentosSelecionados.length === 0) {
+    alert("Atenção: Selecione pelo menos um procedimento realizado ou a opção 'Falta'.");
+    return;
+  }
+
+  // 4. Montar o objeto JSON para enviar ao backend Python (Flask)
+  const dadosAtendimento = {
+    modo: modo,
+    id: atendimentoId,
+    prontuario: prontuario,
+    data_atendimento: dataAtendimento,
+    procedimentos: procedimentosSelecionados
+  };
+
+  // 5. Envio via Fetch
+  fetch('/novo_atendimento', { // Ajuste a rota se necessário no seu app.py
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dadosAtendimento)
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.mensagem || "Atendimento salvo com sucesso!");
+    
+    // Fecha o modal (certifique-se que o nome da função de fechar confere)
+    if (typeof fecharModalAtendimento === 'function') {
+      fecharModalAtendimento();
     }
-
-    // Criamos as listas que o Flask espera receber
-    let data_proxima_consulta = [];
-    let hora_proxima_consulta = [];
-    let profissional_proxima_consulta = [];
-    let tipo_pactuacao_periodo = [];
-    let data_inicio_pactuacao = [];
-    let data_fim_pactuacao = [];
-    let dias_semana_acolhimento = [];
-
-    // Se o checkbox de agendamento estiver marcado, coletamos as linhas
-    if (document.getElementById('marcar_consulta_futura').checked) {
-        document.querySelectorAll('.linha-consulta-futura').forEach(linha => {
-        const dataVal = linha.querySelector('.consulta-data')?.value || '';
-        const horaVal = linha.querySelector('.consulta-hora')?.value || '';
-        
-        // CORREÇÃO AQUI: Garanta que está escrito exatamente .consulta-professional
-        const campoProf = linha.querySelector('.consulta-professional');
-        
-        // Verificação de segurança para o script não travar caso não ache o campo
-        const profVal = campoProf ? campoProf.value : '';
-
-        if (dataVal) {
-            data_proxima_consulta.push(dataVal);
-            hora_proxima_consulta.push(horaVal || '');
-            profissional_proxima_consulta.push(profVal || '');
-        }
-    });
-    }
-
-    if (document.getElementById('marcar_grupo_futuro')?.checked) {
-        document.querySelectorAll('#lista_grupos_futuros .linha-dinamica').forEach(linha => {
-            tipo_pactuacao_periodo.push(linha.querySelector('select[name="tipo_pactuacao_periodo[]"]')?.value || '');
-            data_inicio_pactuacao.push(linha.querySelector('input[name="data_inicio_pactuacao[]"]')?.value || '');
-            data_fim_pactuacao.push(linha.querySelector('input[name="data_fim_pactuacao[]"]')?.value || '');
-            dias_semana_acolhimento.push(linha.querySelector('input[name="dias_semana_acolhimento[]"]')?.value || '');
-        });
-    }
-
-    // Monte o objeto que será enviado via Fetch
-    const dadosFormulario = {
-        prontuario: document.getElementById('prontuario_atendimento').value,
-        data_atendimento: document.getElementById('data_atendimento').value,
-        procedimentos: obterProcedimentosMarcados(), // Ajuste conforme sua função
-        acolhimento_24h: document.getElementById('acolhimento_24h').value,
-        paciente_aceitou: document.getElementById('paciente_aceitou').value,
-        observacoes: document.getElementById('observacoes_atendimento').value,
-        
-        // CHAVE DO PROBLEMA: Aqui enviamos os arrays idênticos aos do Python
-        data_proxima_consulta: data_proxima_consulta,
-        hora_proxima_consulta: hora_proxima_consulta,
-        profissional_proxima_consulta: profissional_proxima_consulta,
-        tipo_pactuacao_periodo: tipo_pactuacao_periodo,
-        data_inicio_pactuacao: data_inicio_pactuacao,
-        data_fim_pactuacao: data_fim_pactuacao,
-        dias_semana_acolhimento: dias_semana_acolhimento
-    };
-
-    // Seu envio Fetch para /novo_atendimento continua aqui abaixo...
-    fetch('/novo_atendimento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dadosFormulario)
-    })
-    .then(res => res.json())
-    .then(data => {
-        const avisos = Array.isArray(data.avisos) && data.avisos.length ? `\n\nAvisos:\n${data.avisos.join('\n')}` : '';
-        alert((data.mensagem || data.erro) + avisos);
-        if(!data.erro) window.location.reload();
-    });
+    
+    location.reload(); // Atualiza a tela para refletir o registro
+  })
+  .catch(err => {
+    console.error('Erro ao salvar atendimento:', err);
+    alert('Erro ao registrar o atendimento no sistema.');
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -849,3 +718,57 @@ document.querySelectorAll('.chk-possui-agenda').forEach(checkbox => {
         });
     });
 });
+
+function salvarServidorAutorizado() {
+    const nome = document.getElementById('nome_novo_servidor').value.trim();
+    const cpf = document.getElementById('cpf_novo_servidor').value.trim();
+    const cbo = document.getElementById('cbo_novo_servidor').value.trim();
+
+    // Validação simples no front-end
+    if (!nome || !cpf || !cbo) {
+        alert("Por favor, preencha todos os campos obrigatórios.");
+        return;
+    }
+
+    const dados = { nome, cpf, cbo };
+
+    // Envio via Fetch para a rota do Flask
+    fetch('/cadastrar_servidor_autorizado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+    })
+    .then(async res => {
+        const respostaJson = await res.json();
+        if (!res.ok) {
+            throw new Error(respostaJson.mensagem || "Erro ao cadastrar servidor.");
+        }
+        return respostaJson;
+    })
+    .then(data => {
+        alert(data.mensagem);
+        
+        // Limpa os campos do formulário
+        document.getElementById('formNovoServidor').reset();
+        
+        // Fecha o modal (usando a API nativa do Bootstrap 5)
+        const modalElement = document.getElementById('modalNovoServidor');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
+        // Recarrega a página para o novo servidor aparecer na tabela
+        location.reload();
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        alert(err.message);
+    });
+}
+
+function abrirModalServidor() {
+    const modalElement = document.getElementById('modalNovoServidor');
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+}

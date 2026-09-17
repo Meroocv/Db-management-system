@@ -1,99 +1,70 @@
 {% extends 'base.html' %}
 
 {% block conteudo %}
+    <div class="container mt-4">
+        <h2>Servidores Autorizados no Sistema</h2>
+        <hr>
 
-<div class="container-fluid escala-layout">
+        <!-- Botão para abrir o modal de cadastro que criamos antes -->
+        <button type="button" class="btn btn-success mb-3" onclick="abrirModalServidor()">
+            + Novo Servidor
+        </button>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="m-0">Escala de Serviço de:</h2>
-        </div>
-
-        <div class="d-flex gap-2 align-items-center">
-            <form method="GET" action="" class="d-flex gap-2 align-items-center m-0">
-                <select name="mes" class="form-select form-select-lg fw-bold border-primary text-primary" onchange="this.form.submit()" style="width: 170px;">
-                    {% for num, nome_mes in meses_ano %}
-                        <option value="{{ num }}" {% if num == mes_atual %}selected{% endif %}>{{ nome_mes }}</option>
-                    {% endfor %}
-                </select>
-                <select name="ano" class="form-select form-select-lg fw-bold border-primary text-primary" onchange="this.form.submit()" style="width: 110px;">
-                    <option value="{{ ano_atual }}" selected>{{ ano_atual }}</option>
-                    <option value="{{ ano_atual + 1 }}">{{ ano_atual + 1 }}</option>
-                </select>
-            </form>
-
-            {% if cargo_usuario == '411010' %}
-            <a href="{{ url_for('configurar_escala', mes=mes_atual, ano=ano_atual) }}" class="btn btn-primary d-flex align-items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16">
-                    <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.86z"/>
-                </svg>
-                Configurar Escala
-            </a>
-            {% endif %}
-        </div>
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Nome</th>        <!-- Dá 50% da largura para o Nome -->
+                    <th style="width: 20%;">CPF</th>         <!-- 20% para o CPF -->
+                    <th style="width: 20%;">CBO / Cargo</th> <!-- 20% para o CBO -->
+                    <th style="width: 10%;">Ações</th>       <!-- 10% para o botão -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for serv in servidores %}
+                <tr>
+                    <td>{{ serv.nome }}</td>  <!-- Atributo 'nome' do BaseServidores -->
+                    <td>{{ serv.cpf }}</td>   <!-- Atributo 'cpf' do BaseServidores -->
+                    <td>{{ serv.cbo }}</td>   <!-- Atributo 'cbo' do BaseServidores -->
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="excluirServidor({{ serv.id }})">
+                            🗑️ Excluir
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">Nenhum servidor pré-cadastrado no sistema.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <a href="/" class="btn btn-secondary mt-3">Voltar ao Início</a>
     </div>
 
-    <ul class="nav nav-tabs mb-4" id="escalaTabs" role="tablist">
-        {% for cargo in escala_por_cargo.keys() %}
-        <li class="nav-item" role="presentation">
-            {% set cargo_id = cargo|replace('é', 'e')|replace('í', 'i')|replace(' ', '_')|lower %}
-            <button class="nav-link {% if loop.first %}active{% endif %} text-capitalize"
-                    id="tab-{{ cargo_id }}"
-                    data-bs-toggle="tab"
-                    data-bs-target="#conteudo-{{ cargo_id }}"
-                    type="button"
-                    role="tab">
-                {{ cargo }}
-            </button>
-        </li>
-        {% endfor %}
-    </ul>
+    <!-- Inclua aqui o seu modal de cadastro de novo servidor que fizemos anteriormente -->
 
-    <div class="tab-content" id="escalaTabsConteudo">
-        {% for cargo, servidores in escala_por_cargo.items() %}
-        {% set cargo_id = cargo|replace('é', 'e')|replace('í', 'i')|replace(' ', '_')|lower %}
-        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="conteudo-{{ cargo_id }}" role="tabpanel">
+    <script>
+        function excluirServidor(id) {
+            if (confirm("Tem certeza que deseja apagar este servidor do sistema? Essa ação não poderá ser desfeita.")) {
+                fetch(`/excluir_servidor/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.mensagem);
+                    location.reload(); // Recarrega a página para atualizar a tabela
+                })
+                .catch(err => {
+                    console.error('Erro:', err);
+                    alert('Erro ao tentar excluir o servidor.');
+                });
+            }
+        }
+    </script>
 
-            <div class="table-responsive escala-table-shell shadow-sm border rounded">
-                <table class="table table-bordered table-striped align-middle m-0 escala-table-view">
-                    <thead class="table-dark text-center" style="position: sticky; top: 0; z-index: 2;">
-                        <tr>
-                            <th style="min-width: 180px; position: sticky; left: 0; background-color: #212529; z-index: 3; border-bottom: none; vertical-align: middle;">
-                                Servidores
-                            </th>
-                            {% for dia in lista_dias %}
-                            <th style="min-width: 65px; width: 65px;">{{ dia.numero }}<br><small style="font-size: 0.7rem; color: #adb5bd;">{{ dia.nome_semana }}</small></th>
-                            {% endfor %}
-                            </tr>
-                        </tr>
-                    </thead>
 
-                    <tbody>
-                        {% for servidor in servidores %}
-                        <tr>
-                            <td style="position: sticky; left: 0; background-color: var(--bs-table-bg); z-index: 1; font-weight: bold;">
-                                {{ servidor.nome }}
-                            </td>
-                            {% for dia in lista_dias %}
-                            <td class="text-center fw-bold text-dark" style="font-size: 0.9rem;">
-                                {{ servidor.turnos[loop.index0] }}
-                            </td>
-                            {% endfor %}
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="{{ lista_dias|length + 1 }}" class="text-center text-muted py-3">
-                                Nenhum servidor cadastrado nesta categoria.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-        {% endfor %}
-    </div>
-</div>
 
 {% endblock %}
+
