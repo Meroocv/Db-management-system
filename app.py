@@ -87,6 +87,24 @@ class Paciente(db.Model):
     
     telefones = db.relationship('TelefonePaciente', backref='paciente', cascade="all, delete-orphan", lazy=True)
 
+    @property
+    def data_nascimento_formatada(self):
+        if not self.data_nascimento:
+            return ''
+
+        data_str = str(self.data_nascimento).strip()
+
+        # Se já tiver barra, retorna como está
+        if '/' in data_str:
+            return data_str
+
+        try:
+        # Converte de AAAA-MM-DD para DD/MM/AAAA
+            data_obj = datetime.strptime(data_str, '%Y-%m-%d')
+            return data_obj.strftime('%d/%m/%Y')
+        except ValueError:
+            return data_str
+
     def __repr__(self):
         return f"<Paciente {self.nome_paciente} (Prontuario: {self.prontuario})>"
 
@@ -564,54 +582,50 @@ def atendimentos():
 
 @app.route('/novo_atendimento', methods=['POST'])
 def novo_atendimento():
+    if 'usuario' not in session:
+        return jsonify({'sucesso': False, 'mensagem': 'Usuário não autenticado.'}), 401
+
     try:
-        # Pega os dados JSON enviados pelo Fetch do JavaScript
         dados = request.get_json()
-        
         if not dados:
-            return jsonify({'mensagem': 'Nenhum dado foi enviado.'}), 400
+            return jsonify({'sucesso': False, 'mensagem': 'Nenhum dado foi enviado.'}), 400
 
-        # Extraindo os campos principais
-        prontuario = dados.get('prontuario')
+        prontuario = (dados.get('prontuario') or '').strip()
         data_atendimento = dados.get('data_atendimento')
-        procedimentos = dados.get('procedimentos', []) # Vem como uma lista de strings
+        procedimentos = dados.get('procedimentos', [])
 
-        # Validações básicas no backend
         if not prontuario or not data_atendimento:
-            return jsonify({'mensagem': 'Prontuário e Data do Atendimento são obrigatórios.'}), 400
-            
-        if not procedimentos or len(procedimentos) == 0:
-            return jsonify({'mensagem': 'Selecione pelo menos um procedimento.'}), 400
+            return jsonify({'sucesso': False, 'mensagem': 'Prontuário e Data são obrigatórios.'}), 400
 
-        # Transforma a lista de procedimentos em uma string separada por vírgula para salvar no banco
-        procedimentos_str = ", ".join(procedimentos)
+        if not procedimentos:
+            return jsonify({'sucesso': False, 'mensagem': 'Selecione pelo menos um procedimento.'}), 400
 
-        # -------------------------------------------------------------
-        # SALVANDO DE FATO NO BANCO DE DADOS (SQLite)
-        # -------------------------------------------------------------
-        conexao = sqlite3.connect('seu_banco.db') # Substitua pelo nome do seu arquivo de banco de dados
-        cursor = conexao.cursor()
-        
-        cursor.execute("""
-            INSERT INTO atendimentos (prontuario, data_atendimento, procedimentos) 
-            VALUES (?, ?, ?)
-        """, (prontuario, data_atendimento, procedimentos_str))
-        
-        conexao.commit()
-        conexao.close()
-        # -------------------------------------------------------------
+        # Aceita lista ou string vinda do JavaScript
+        if isinstance(procedimentos, list):
+            procedimentos_str = ", ".join(procedimentos)
+        else:
+            procedimentos_str = str(procedimentos)
 
-        return jsonify({
-            'sucesso': True, 
-            'mensagem': 'Atendimento registrado com sucesso!'
-        }), 200
+        novo = Atendimento(
+            prontuario=prontuario,
+            data_atendimento=data_atendimento,
+            procedimentos=procedimentos_str,
+            profissional=session.get('usuario'),
+            acolhimento_24h=dados.get('acolhimento_24h'),
+            paciente_aceitou=dados.get('paciente_aceitou'),
+            observacoes=dados.get('observacoes'),
+            servidor_id=session.get('usuario_id')
+        )
+
+        db.session.add(novo)
+        db.session.commit()
+
+        return jsonify({'sucesso': True, 'mensagem': 'Atendimento registrado com sucesso!'}), 200
 
     except Exception as e:
+        db.session.rollback()
         print(f"Erro ao registrar atendimento: {str(e)}")
-        return jsonify({
-            'sucesso': False, 
-            'mensagem': f'Erro interno ao salvar: {str(e)}'
-        }), 500
+        return jsonify({'sucesso': False, 'mensagem': f'Erro interno ao salvar: {str(e)}'}), 500
     
 @app.route('/atualizar_atendimento', methods=['POST'])
 def atualizar_atendimento():
@@ -693,38 +707,61 @@ def logout():
 
 @app.route('/atualizar_paciente', methods=['POST'])
 def atualizar_paciente():
-    dados = request.get_json()
-    prontuario = dados.get('prontuario')
+  dados = request.get_json()
+  prontuario = dados.get('prontuario')
 
-    paciente = Paciente.query.filter_by(prontuario=prontuario).first()
-    if not paciente:
-        return jsonify({'erro': 'Paciente nao encontrado'}), 404
+  paciente = Paciente.query.filter_by(prontuario=prontuario).first()
+  if not paciente:
+    return jsonify({'erro': 'Paciente nao encontrado'}), 404
 
-    try:
-        for campo, valor in dados.items():
-            if hasattr(paciente, campo) and campo not in ['prontuario', 'telefones']:
-                setattr(paciente, campo, valor)
+  try:
+    for campo, valor in dados.items():
+      if hasattr(paciente, campo) and campo not in ['prontuario', 'telefones']:
+        # 🌟 Se o valor veio vazio/null, evitamos sobrescrever um dado que já existia (opcional,
+        # mas se quiser permitir limpar campos, remova o 'and valor != ""').
+        # Mas para a data de nascimento, vamos garantir que se veio algo válido, seja aplicado:
+        if campo == 'data_nascimento':
+          if valor:  # Só atualiza se o usuário mandou uma data de fato
+            setattr(paciente, campo, valor)
+        else:
+          # Para os outros campos, atribui normalmente (ou trata vazios se preferir)
+          setattr(paciente, campo, valor)
 
-        TelefonePaciente.query.filter_by(prontuario_paciente=prontuario).delete()
+    # Tratamento específico caso a data venha vazia explicitamente no JSON
+    if 'data_nascimento' in dados and not dados.get('data_nascimento'):
+      paciente.data_nascimento = None
 
-        telefones_recebidos = dados.get('telefones', [])
-        for tel in telefones_recebidos:
-            novo_tel = TelefonePaciente(
-                prontuario_paciente=prontuario,
-                ddd=tel.get('ddd'),
-                numero=tel.get('numero'),
-                tipo=tel.get('tipo'),
-                nome_familiar=tel.get('nome_familiar') if tel.get('tipo') == 'Familiar' else None,
-                parentesco_familiar=tel.get('parentesco_familiar') if tel.get('tipo') == 'Familiar' else None
-            )
-            db.session.add(novo_tel)
+    # Atualiza os telefones (mantém como já estava, pois está ótimo)
+    TelefonePaciente.query.filter_by(prontuario_paciente=prontuario).delete()
 
-        db.session.commit()
-        return jsonify({'mensagem': 'Paciente e lista de telefones atualizados com sucesso!'})
+    telefones_recebidos = dados.get('telefones', [])
+    for tel in telefones_recebidos:
+      novo_tel = TelefonePaciente(
+          prontuario_paciente=prontuario,
+          ddd=tel.get('ddd'),
+          numero=tel.get('numero'),
+          tipo=tel.get('tipo'),
+          nome_familiar=(
+              tel.get('nome_familiar')
+              if tel.get('tipo') == 'Familiar'
+              else None
+          ),
+          parentesco_familiar=(
+              tel.get('parentesco_familiar')
+              if tel.get('tipo') == 'Familiar'
+              else None
+          ),
+      )
+      db.session.add(novo_tel)
 
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"erro": f"Erro ao atualizar: {str(e)}"}), 500
+    db.session.commit()
+    return jsonify(
+        {'mensagem': 'Paciente e lista de telefones atualizados com sucesso!'}
+    )
+
+  except Exception as e:
+    db.session.rollback()
+    return jsonify({'erro': f'Erro ao atualizar: {str(e)}'}), 500
     
 @app.route('/buscar_paciente')
 def buscar_paciente():
